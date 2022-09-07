@@ -76,7 +76,8 @@ class SpmTokenizer(Tokenizer):
                ids: Union[List[List[int]], torch.Tensor]):
         if isinstance(ids, torch.Tensor):
             ids = ids.tolist()
-        return [self.spm.DecodeIdsWithCheck(x) for x in ids]
+        # return [self.spm.DecodeIdsWithCheck(x) for x in ids]
+        return [self.spm.DecodeIds(x) for x in ids]
 
 
 class BERTTokenizer(Tokenizer):

@@ -229,11 +229,15 @@ class Attention(nn.Module):
             key = torch.cat((past_key, key), dim=-1)
             value = torch.cat((past_value, value), dim=-2)
 
+            past_attn = torch.LongTensor([0] * query.shape[0]).unsqueeze(1).unsqueeze(2).unsqueeze(3).to(query.device)
+            attention_mask = torch.cat([past_attn, attention_mask], dim=-1)
+
+            # 32 x 128 x 129
+
         if use_cache is True:
             present = torch.stack((key.transpose(-2, -1), value))  # transpose to have same shapes for stacking
         else:
             present = (None,)
-
         attn_outputs = self._attn(query, key, value, attention_mask, head_mask, output_attentions)
         a = attn_outputs[0]
 
@@ -629,10 +633,10 @@ class OptimusDecoder(GPT2PreTrainedModel):
             shift_logits = lm_logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
-            loss_fct = CrossEntropyLoss(reduction="none")
-            losses = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-            bz = labels.size(0)
-            loss = losses[shift_labels.view(-1) != self.pad_id].sum() / bz
+            loss_fct = CrossEntropyLoss(reduction="mean", ignore_index=self.pad_id)
+            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            # bz = labels.size(0)
+            # loss = losses[shift_labels.view(-1) != self.pad_id].sum() / bz
 
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]

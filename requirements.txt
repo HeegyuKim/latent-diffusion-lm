@@ -1,5 +1,6 @@
 torch
 transformers
+datasets
 sentencepiece
 click
 py-rouge
@@ -12,3 +13,6 @@ requests
 nltk
 huggingface_hub
 diffusers
+omegaconf
+hydra-core
+pytorch-lightning

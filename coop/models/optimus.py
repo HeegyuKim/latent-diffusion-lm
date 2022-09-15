@@ -76,6 +76,8 @@ class Optimus(Model):
                  z: torch.Tensor,
                  num_beams: int = 4,
                  max_tokens: int = 256,
+                 min_length: int = 0,
+                 no_repeat_ngram_size: int = 2,
                  bad_words_ids: List[int] = None):
         bz, _ = z.size()
 
@@ -83,14 +85,14 @@ class Optimus(Model):
         generated = self.decoder.generate(
             input_ids,
             max_length=max_tokens,
-            min_length=16,
+            min_length=min_length,
             num_beams=num_beams,
             bad_words_ids=bad_words_ids,
             bos_token_id=self.bos_id,
             pad_token_id=self.pad_id,
             eos_token_id=self.eos_id,
             past_key_values=(z,),
-            no_repeat_ngram_size=2,
+            no_repeat_ngram_size=no_repeat_ngram_size,
             latent_as_gpt_memory=True,
             latent_as_gpt_emb=True).tolist()
         return generated
@@ -230,7 +232,9 @@ class Attention(nn.Module):
             value = torch.cat((past_value, value), dim=-2)
 
             past_attn = torch.LongTensor([0] * query.shape[0]).unsqueeze(1).unsqueeze(2).unsqueeze(3).to(query.device)
-            attention_mask = torch.cat([past_attn, attention_mask], dim=-1)
+
+            if attention_mask is not None:
+                attention_mask = torch.cat([past_attn, attention_mask], dim=-1)
 
             # 32 x 128 x 129
 
@@ -532,7 +536,7 @@ class OptimusGPT2(GPT2PreTrainedModel):
         )
 
 
-class OptimusDecoder(GPT2PreTrainedModel):
+class OptimusDecoder(GPT2LMHeadModel):
     authorized_missing_keys = [r"h\.\d+\.attn\.masked_bias", r"lm_head\.weight"]
 
     def __init__(self, config, latent_dim, pad_id):

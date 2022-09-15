@@ -1,0 +1,4 @@
+defaults:
+- model: optimus
+- optimizer: adam
+- trainer: base

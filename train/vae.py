@@ -17,6 +17,8 @@ class VAEConfig(BaseConfig):
     latent_dim: int = 512
     label_for_pad_id: int = -100
     max_seq_len: int = 128
+    
+    checkout_step: int = 1750
     dataset_name: str = "yelp_polarity"
 
 
@@ -54,11 +56,38 @@ class VAETrainer(BaseTrainer):
 
         losses = self.vae(src=src, tgt=tgt)
         # losses = self.model(**batch)
-        # nll, zkl, zkl_real = losses.nll, losses.zkl, losses.zkl_real
-        # klw = self.vae.klw(self.step, self.checkout_step)
+        nll, zkl, zkl_real = losses.nll, losses.zkl, losses.zkl_real
+        klw = self.vae.klw(self.step, self.config.checkout_step)
         # loss = nll + klw * zkl
-        return losses.nll
+        return losses.nll + losses.zkl * klw
+
+    @torch.no_grad()
+    def evaluate(self, epoch: int):
+        texts = """
+        this food is amazing!!
+        this food is delicious
+        this food is disgusting
+        omg what a wonderful restaurant 
+        """.strip().split("\n")
+        self.vae.eval()
+
+        for text in texts:
+            inputs = self.enc_tok(text.strip(), return_tensors="pt")
+            switch_dict_tensor_device(inputs, self.config.device)
+            
+            latent = self.vae(src=inputs).q.mean
+            generated = self.vae.generate(latent, max_tokens=64, min_length=4, no_repeat_ngram_size=2, num_beams=5)[0]
+
+            print(text.strip(), "->", self.dec_tok.decode(generated))
+
+        torch.save(self.vae.state_dict(), "vae.pt")
+        self.vae.train()
 
 
 if __name__ == "__main__":
-    VAETrainer(VAEConfig()).train()
+    config = VAEConfig(train_batch_size=4, learning_rate=1e-5)
+    trainer = VAETrainer(config)
+    trainer.train()
+
+    # trainer.setup(config)
+    # trainer.evaluate(0)

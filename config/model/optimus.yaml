@@ -1,0 +1,5 @@
+model: optimus
+encoder: bert-base-cased
+decoder: gpt2
+latent_dim: 512
+max_seq_len: 128

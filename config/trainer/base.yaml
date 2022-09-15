@@ -1,0 +1,7 @@
+train_batch_size: 32
+train_epochs: 50
+train_steps: ~
+
+eval_batch_size: 32
+eval_strategy: epoch # or steps
+eval_steps: ~

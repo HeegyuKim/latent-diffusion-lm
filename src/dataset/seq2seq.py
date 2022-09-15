@@ -1,15 +1,15 @@
-from typing import Optional, Sequence, Union
+from typing import Any, Optional, Sequence, Union
 from pydantic import BaseModel
 
 import torch
 from torch.utils.data import Dataset
-
+from transformers import PreTrainedTokenizer
 from tokenizers import Tokenizer
 
 
 class BaseSeq2SeqDataset(Dataset, BaseModel):
-    dataset: Sequence
-    tokenizer: Tokenizer
+    dataset: Any
+    tokenizer: Any
     max_length: int
     bos_token_id: Optional[int] = None
     eos_token_id: Optional[int] = None
@@ -19,23 +19,26 @@ class BaseSeq2SeqDataset(Dataset, BaseModel):
     padding_side: str = "right"
     truncation: bool = True
     truncation_side: str = "right"
-    
+
+    class Config:
+        arbitrary_types_allowed = True
+
     def __len__(self):
         return len(self.dataset)
-        
+
     def pad(self, ids: list[int], pad_value: Optional[int] = None) -> list[int]:
         if pad_value is None:
             pad_value = self.pad_token_id
 
-        pad_len = len(ids) - self.max_length
+        pad_len = self.max_length - len(ids)
         if pad_len > 0:
             pad_ids = [pad_value] * pad_len
 
-            if self.padding_side == "left":
+            if self.padding_side == "right":
                 ids = ids + pad_ids
             else:
                 ids = pad_ids + ids
-                
+
         return ids
 
     def truncate(self, ids: list[int]) -> list[int]:
@@ -62,10 +65,10 @@ class BaseSeq2SeqDataset(Dataset, BaseModel):
 
     def encode(self, text: str, prefix: str = "") -> list[int]:
         ids = self.tokenizer.encode(text, add_special_tokens=False)
-        
+
         if self.truncation:
             ids = self.truncate(ids)
-            
+
         masks = [1] * len(ids)
         labels = ids.copy()
 
@@ -77,24 +80,24 @@ class BaseSeq2SeqDataset(Dataset, BaseModel):
         return {
             f"{prefix}input_ids": ids,
             f"{prefix}attention_mask": masks,
-            f"{prefix}labels": labels
+            f"{prefix}labels": labels,
         }
+
 
 class Seq2SeqDataset(BaseSeq2SeqDataset):
     prefix: str = ""
 
     def __getitem__(self, index) -> dict:
         text = self.dataset[index]["text"]
-        return self.encode(self.encoder_tokenizer, text, prefix=self.prefix)
-        
+        return self.encode(text, prefix=self.prefix)
+
 
 class OptimusDataset(Dataset):
-
     def __init__(
         self,
         dataset: Sequence,
-        encoder_tokenizer: Tokenizer,
-        decoder_tokenizer: Tokenizer,
+        encoder_tokenizer: PreTrainedTokenizer,
+        decoder_tokenizer: PreTrainedTokenizer,
         max_length: int,
         encoder_bos_token_id: Optional[int] = None,
         encoder_eos_token_id: Optional[int] = None,
@@ -107,7 +110,7 @@ class OptimusDataset(Dataset):
         padding_side: str = "right",
         truncation: bool = True,
         truncation_side: str = "right",
-        ) -> None:
+    ) -> None:
         super().__init__()
 
         self.encoder_dataset = Seq2SeqDataset(
@@ -122,8 +125,8 @@ class OptimusDataset(Dataset):
             padding_side=padding_side,
             truncation=truncation,
             truncation_side=truncation_side,
-            prefix="source_"
-            )
+            prefix="source_",
+        )
 
         self.decoder_dataset = Seq2SeqDataset(
             dataset=dataset,
@@ -137,8 +140,8 @@ class OptimusDataset(Dataset):
             padding_side=padding_side,
             truncation=truncation,
             truncation_side=truncation_side,
-            prefix="target_"
-            )
+            prefix="target_",
+        )
 
     def __len__(self) -> int:
         return len(self.encoder_dataset)
@@ -147,7 +150,4 @@ class OptimusDataset(Dataset):
         source = self.encoder_dataset[index]
         target = self.decoder_dataset[index]
 
-        return {
-            **source,
-            **target
-        }
+        return {**source, **target}

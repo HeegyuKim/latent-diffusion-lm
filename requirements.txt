@@ -15,3 +15,4 @@ diffusers
 omegaconf
 hydra-core
 pytorch-lightning
+pydantic

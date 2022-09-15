@@ -23,6 +23,11 @@ def get_optimizer(config: DictConfig, params):
     else:
         raise Exception(f"{oc.cls} is unsupported optimizer type.")
 
+
+def get_scheduler(config: DictConfig):
+    return None
+
+
 def get_model(config: DictConfig):
     mc = config.model
 
@@ -66,6 +71,7 @@ class BaseLitModule(pl.LightningModule):
         self.model = get_model(config)
 
     def configure_optimizers(self):
-        get_optimizer(self.config, params)
-        return optimizer
+        optim = get_optimizer(self.config, self.parameters())
+        sched = get_scheduler(self.config)
+        return optim, sched
 

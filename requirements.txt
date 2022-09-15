@@ -6,7 +6,6 @@ click
 py-rouge
 tqdm
 pandas
-# jsonnet
 allennlp
 tensorboard
 requests

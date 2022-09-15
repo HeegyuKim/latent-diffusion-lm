@@ -1,4 +1,5 @@
 defaults:
+- dataset: yelp_polarity
 - model: optimus
 - optimizer: adam
 - trainer: base

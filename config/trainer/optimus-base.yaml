@@ -1,0 +1,4 @@
+defaults:
+- base
+
+optimus_checkout_step: 2000

@@ -15,7 +15,6 @@ from torch.utils.data import Dataset, DataLoader
 from datasets import load_dataset
 
 
-
 @dataclass
 class BaseConfig:
     learning_rate: float = 1e-4
@@ -25,6 +24,7 @@ class BaseConfig:
     loss: str = "mse"
     device: str = "cuda"
 
+
 def switch_dict_tensor_device(d: Dict, device: str):
     for k, v in d.items():
         if torch.is_tensor(v) and v.device != device:
@@ -32,7 +32,6 @@ def switch_dict_tensor_device(d: Dict, device: str):
 
 
 class BaseTrainer:
-
     def __init__(self, config: BaseConfig) -> None:
         self.config = config
 
@@ -64,7 +63,9 @@ class BaseTrainer:
         optim = self.get_optimizer()
         device = self.config.device
 
-        train_loader = DataLoader(self.train_dataset, self.config.eval_batch_size, shuffle=True)
+        train_loader = DataLoader(
+            self.train_dataset, self.config.eval_batch_size, shuffle=True
+        )
 
         desc = tqdm(train_loader, desc=f"epoch {epoch}")
         for batch in desc:
@@ -72,12 +73,12 @@ class BaseTrainer:
 
             loss = self.train_step(batch)
             loss.backward()
-            
+
             desc.desc = f"epoch {epoch}, loss={loss.item()}"
 
             optim.step()
             optim.zero_grad()
-            
+
             self.step += 1
 
     def train_step(self, batch: Dict) -> Dict:
@@ -89,4 +90,3 @@ class BaseTrainer:
     @torch.no_grad()
     def evaluate(self, epoch: int):
         pass
-

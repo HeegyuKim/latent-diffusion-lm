@@ -23,17 +23,19 @@ from evaluate import evaluate
 
 
 class Trainer:
-    def __init__(self,
-                 model: Model,
-                 data: List[Dataset],
-                 log_dir: Path,
-                 num_steps: int,
-                 checkout_step: int,
-                 batch_size: int,
-                 lr: float = 1e-4,
-                 clip_value: float = 5.,
-                 max_norm: float = 1.,
-                 num_keep: int = 10):
+    def __init__(
+        self,
+        model: Model,
+        data: List[Dataset],
+        log_dir: Path,
+        num_steps: int,
+        checkout_step: int,
+        batch_size: int,
+        lr: float = 1e-4,
+        clip_value: float = 5.0,
+        max_norm: float = 1.0,
+        num_keep: int = 10,
+    ):
         log_dir = Path(log_dir)
         if torch.cuda.is_available():
             model.cuda()
@@ -41,9 +43,11 @@ class Trainer:
         self.model = model
         self.train, self.dev, self.test = data
 
-        self.opt = Adam(self.model.parameters(), lr, betas=(0.5, 0.999), eps=1e-6, )
+        self.opt = Adam(self.model.parameters(), lr, betas=(0.5, 0.999), eps=1e-6,)
 
-        self.scheduler = get_linear_schedule_with_warmup(self.opt, checkout_step // 10, num_steps)
+        self.scheduler = get_linear_schedule_with_warmup(
+            self.opt, checkout_step // 10, num_steps
+        )
 
         self.clip_value = clip_value
         self.max_norm = max_norm
@@ -53,16 +57,17 @@ class Trainer:
         self.log_dir = log_dir
         self.logger = get_logger(log_dir)
         self.losses = defaultdict(list)
-        self.best_score = 0.
-        self.writer = {key: SummaryWriter(log_dir=str(log_dir / "log" / key)) for key in ("train", "dev", "test")}
+        self.best_score = 0.0
+        self.writer = {
+            key: SummaryWriter(log_dir=str(log_dir / "log" / key))
+            for key in ("train", "dev", "test")
+        }
         self.global_step = 0
         self.num_keep = num_keep
         self.model_path = []
 
     @classmethod
-    def from_config(cls,
-                    config: dict,
-                    log_dir: Path):
+    def from_config(cls, config: dict, log_dir: Path):
         json.dump(config, open(log_dir / "config.json", "w"))
         if "spm_path" in config:
             shutil.copy(config["spm_path"], log_dir / "spm.model")
@@ -72,9 +77,7 @@ class Trainer:
 
         return cls(model, data, log_dir, **config.pop("trainer"))
 
-    def _fit_partial(self,
-                     batch,
-                     p: tqdm = None):
+    def _fit_partial(self, batch, p: tqdm = None):
         self.model.train()
         self.model.zero_grad()
         losses = self.model(**batch)
@@ -87,20 +90,32 @@ class Trainer:
         else:
             clip_grad_value_(self.model.parameters(), self.clip_value)
 
-        loss_dict = {"nll": nll.item(), "klw": klw, "zkl": zkl.item(), "zkl_real": zkl_real.item()}
+        loss_dict = {
+            "nll": nll.item(),
+            "klw": klw,
+            "zkl": zkl.item(),
+            "zkl_real": zkl_real.item(),
+        }
 
         self.opt.step()
         self.scheduler.step()
 
         if p is not None:
             for k, v in loss_dict.items():
-                self.writer["train"].add_scalar(f"Loss/{k}", v, global_step=self.global_step)
+                self.writer["train"].add_scalar(
+                    f"Loss/{k}", v, global_step=self.global_step
+                )
                 self.losses[k].append(v)
             p.set_postfix(**loss_dict)
             p.update()
 
     def fit(self):
-        train = DataLoader(self.train, batch_size=self.batch_size, shuffle=True, collate_fn=self.train.collate_fn)
+        train = DataLoader(
+            self.train,
+            batch_size=self.batch_size,
+            shuffle=True,
+            collate_fn=self.train.collate_fn,
+        )
         p = tqdm(desc=f"Step {self.global_step}", total=self.checkout_step, ncols=100)
 
         while True:
@@ -118,7 +133,11 @@ class Trainer:
                     if self.global_step == self.num_steps:
                         self._finalize()
                         return
-                    p = tqdm(desc=f"Step {self.global_step}", total=self.checkout_step, ncols=100)
+                    p = tqdm(
+                        desc=f"Step {self.global_step}",
+                        total=self.checkout_step,
+                        ncols=100,
+                    )
 
     def _finalize(self):
         archive_file = self.log_dir / "model.tar.gz"
@@ -137,19 +156,31 @@ class Trainer:
             metrics[data_type] = evaluate(self.model, data, debug=True)
             for k, v in metrics[data_type].items():
                 metric, tgt, key = k.split("_")
-                self.writer[data_type].add_scalar(f"Metrics/{tgt}/{metric}/{key}/", v, global_step=self.global_step)
+                self.writer[data_type].add_scalar(
+                    f"Metrics/{tgt}/{metric}/{key}/", v, global_step=self.global_step
+                )
 
         df = pd.DataFrame(metrics)
         df.sort_index(inplace=True)
         print(df)
-        json.dump(metrics, open(self.log_dir / f"metrics-step_{self.global_step}.json", "w"))
+        json.dump(
+            metrics, open(self.log_dir / f"metrics-step_{self.global_step}.json", "w")
+        )
         dev_scores = {f"R{i}": df["dev"][f"rouge-{i}_sum_f"] for i in "12l"}
         if sum(dev_scores.values()) > self.best_score:
             self.best_score = sum(dev_scores.values())
-            shutil.copy(self.log_dir / f"metrics-step_{self.global_step}.json", self.log_dir / "metrics.json")
-            shutil.copy(self.log_dir / f"model-step_{self.global_step}.th", self.log_dir / "best.th")
-            shutil.copy(self.log_dir / f"training_metrics-step_{self.global_step}.json",
-                        self.log_dir / "training_metrics.json")
+            shutil.copy(
+                self.log_dir / f"metrics-step_{self.global_step}.json",
+                self.log_dir / "metrics.json",
+            )
+            shutil.copy(
+                self.log_dir / f"model-step_{self.global_step}.th",
+                self.log_dir / "best.th",
+            )
+            shutil.copy(
+                self.log_dir / f"training_metrics-step_{self.global_step}.json",
+                self.log_dir / "training_metrics.json",
+            )
             self.logger.info("Best scores")
             for k, v in dev_scores.items():
                 self.logger.info(f"DEV: {k}={100 * v:.2f}")
@@ -157,19 +188,20 @@ class Trainer:
             for k, v in test_scores.items():
                 self.logger.info(f"TEST: {k}={100 * v:.2f}")
 
-    def _archive(self,
-                 losses: Dict[str, float]):
+    def _archive(self, losses: Dict[str, float]):
         model_path = self.log_dir / f"model-step_{self.global_step}.th"
         torch.save(self.model.state_dict(), model_path)
-        json.dump(losses, open(self.log_dir / f"training_metrics-step_{self.global_step}.json", "w"))
+        json.dump(
+            losses,
+            open(self.log_dir / f"training_metrics-step_{self.global_step}.json", "w"),
+        )
         self.model_path.append(model_path)
         if len(self.model_path) > self.num_keep:
             self.model_path.pop(0).unlink()
 
-    def _avg_loss(self,
-                  p: tqdm):
+    def _avg_loss(self, p: tqdm):
         losses = {k: sum(v) / len(v) for k, v in self.losses.items()}
-        losses["klw"] = 1.
+        losses["klw"] = 1.0
         p.set_postfix(**losses)
         p.update()
         self.losses.clear()
@@ -189,5 +221,5 @@ def main(config_file, log_dir):
     trainer.fit()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

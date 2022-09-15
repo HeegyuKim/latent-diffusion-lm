@@ -11,22 +11,28 @@ from . import Model
 from .util import Losses, VAEOut
 import warnings
 
-PAD, BOS, EOS = '<PAD>', '<BOS>', '<EOS>'
-SPECIAL = {'pad_token': PAD, 'bos_token': BOS, 'eos_token': EOS}
+PAD, BOS, EOS = "<PAD>", "<BOS>", "<EOS>"
+SPECIAL = {"pad_token": PAD, "bos_token": BOS, "eos_token": EOS}
 
 
 class Optimus(Model):
-    def __init__(self,
-                 latent_dim: int,
-                 pad_id: int,
-                 bos_id: int,
-                 eos_id: int,
-                 free_bit: float = 0.05):
+    def __init__(
+        self,
+        latent_dim: int,
+        pad_id: int,
+        bos_id: int,
+        eos_id: int,
+        free_bit: float = 0.05,
+    ):
         encoder = BertModel.from_pretrained("bert-base-cased", return_dict=True)
         super().__init__(encoder.config.hidden_size, latent_dim)
         self.encoder = encoder
-        self.decoder = OptimusDecoder.from_pretrained("gpt2", latent_dim=latent_dim, pad_id=pad_id, return_dict=True)
-        self.decoder.resize_token_embeddings(self.decoder.config.vocab_size + len(SPECIAL))
+        self.decoder = OptimusDecoder.from_pretrained(
+            "gpt2", latent_dim=latent_dim, pad_id=pad_id, return_dict=True
+        )
+        self.decoder.resize_token_embeddings(
+            self.decoder.config.vocab_size + len(SPECIAL)
+        )
 
         self.latent_dim = latent_dim
 
@@ -34,16 +40,20 @@ class Optimus(Model):
         self.bos_id = bos_id
         self.eos_id = eos_id
 
-        self.proj = nn.Linear(self.encoder.config.hidden_size, 2 * latent_dim, bias=False)
+        self.proj = nn.Linear(
+            self.encoder.config.hidden_size, 2 * latent_dim, bias=False
+        )
 
         self.free_bit = free_bit
 
-    def forward(self,
-                src: Dict[str, torch.Tensor],
-                tgt: Dict[str, torch.Tensor] = None,
-                do_generate: torch.Tensor = False,
-                num_beams: int = 4,
-                **kwargs):
+    def forward(
+        self,
+        src: Dict[str, torch.Tensor],
+        tgt: Dict[str, torch.Tensor] = None,
+        do_generate: torch.Tensor = False,
+        num_beams: int = 4,
+        **kwargs,
+    ):
         cls_vec = self.encoder(**src).pooler_output
         mu, log_var = torch.chunk(self.proj(cls_vec), chunks=2, dim=-1)
         std = torch.exp(0.5 * log_var)
@@ -58,10 +68,12 @@ class Optimus(Model):
         if self.training:
             assert tgt is not None
             z = q.rsample()
-            outputs = self.decoder(**tgt,
-                                   past_key_values=(z,),
-                                   latent_as_gpt_memory=True,
-                                   latent_as_gpt_emb=True)
+            outputs = self.decoder(
+                **tgt,
+                past_key_values=(z,),
+                latent_as_gpt_memory=True,
+                latent_as_gpt_emb=True,
+            )
             return Losses(nll=outputs.loss, zkl=zkl, zkl_real=zkl_real)
         else:
             if do_generate:
@@ -72,13 +84,15 @@ class Optimus(Model):
             return VAEOut(q=q, generated=generated)
 
     @torch.no_grad()
-    def generate(self,
-                 z: torch.Tensor,
-                 num_beams: int = 4,
-                 max_tokens: int = 256,
-                 min_length: int = 0,
-                 no_repeat_ngram_size: int = 2,
-                 bad_words_ids: List[int] = None):
+    def generate(
+        self,
+        z: torch.Tensor,
+        num_beams: int = 4,
+        max_tokens: int = 256,
+        min_length: int = 0,
+        no_repeat_ngram_size: int = 2,
+        bad_words_ids: List[int] = None,
+    ):
         bz, _ = z.size()
 
         input_ids = z.new_full((bz, 1), dtype=torch.long, fill_value=self.bos_id)
@@ -94,25 +108,25 @@ class Optimus(Model):
             past_key_values=(z,),
             no_repeat_ngram_size=no_repeat_ngram_size,
             latent_as_gpt_memory=True,
-            latent_as_gpt_emb=True).tolist()
+            latent_as_gpt_emb=True,
+        ).tolist()
         return generated
 
     def reset_decoder(self):
         device = self.encoder.device
-        self.decoder = OptimusDecoder.from_pretrained("gpt2", latent_dim=self.latent_dim, pad_id=self.pad_id,
-                                                      return_dict=True)
-        self.decoder.resize_token_embeddings(self.decoder.config.vocab_size + len(SPECIAL))
+        self.decoder = OptimusDecoder.from_pretrained(
+            "gpt2", latent_dim=self.latent_dim, pad_id=self.pad_id, return_dict=True
+        )
+        self.decoder.resize_token_embeddings(
+            self.decoder.config.vocab_size + len(SPECIAL)
+        )
         self.decoder.to(device)
         self.train()
 
     @staticmethod
-    def klw(step: int,
-            interval: int,
-            r: float = 0.75,
-            t: float = 0.5,
-            s: int = 100000):
+    def klw(step: int, interval: int, r: float = 0.75, t: float = 0.5, s: int = 100000):
         value = (step % interval) / interval
-        klw = max(min((value - t) / (r - t), 1.), 0.)
+        klw = max(min((value - t) / (r - t), 1.0), 0.0)
         return klw
 
 
@@ -124,7 +138,10 @@ class Attention(nn.Module):
         # [switch nx => n_state from Block to Attention to keep identical to TF implem]
         assert n_state % config.n_head == 0
         self.register_buffer(
-            "bias", torch.tril(torch.ones((n_ctx, n_ctx), dtype=torch.uint8)).view(1, 1, n_ctx, n_ctx)
+            "bias",
+            torch.tril(torch.ones((n_ctx, n_ctx), dtype=torch.uint8)).view(
+                1, 1, n_ctx, n_ctx
+            ),
         )
         self.register_buffer("masked_bias", torch.tensor(-1e4))
         self.n_head = config.n_head
@@ -147,7 +164,9 @@ class Attention(nn.Module):
         heads, index = find_pruneable_heads_and_indices(
             heads, self.n_head, self.split_size // self.n_head, self.pruned_heads
         )
-        index_attn = torch.cat([index, index + self.split_size, index + (2 * self.split_size)])
+        index_attn = torch.cat(
+            [index, index + self.split_size, index + (2 * self.split_size)]
+        )
 
         # Prune conv1d layers
         self.c_attn = prune_conv1d_layer(self.c_attn, index_attn, dim=1)
@@ -158,7 +177,9 @@ class Attention(nn.Module):
         self.n_head = self.n_head - len(heads)
         self.pruned_heads = self.pruned_heads.union(heads)
 
-    def _attn(self, q, k, v, attention_mask=None, head_mask=None, output_attentions=False):
+    def _attn(
+        self, q, k, v, attention_mask=None, head_mask=None, output_attentions=False
+    ):
         w = torch.matmul(q, k)
         if self.scale:
             w = w / (float(v.size(-1)) ** 0.5)
@@ -166,7 +187,7 @@ class Attention(nn.Module):
 
         if not self.is_cross_attention:
             # if only "normal" attention layer implements causal mask
-            mask = self.bias[:, :, ns - nd: ns, :ns]
+            mask = self.bias[:, :, ns - nd : ns, :ns]
             w = torch.where(mask.bool(), w, self.masked_bias.to(w.dtype))
 
         if attention_mask is not None:
@@ -199,22 +220,24 @@ class Attention(nn.Module):
             return x.permute(0, 2, 1, 3)  # (batch, head, seq_length, head_features)
 
     def forward(
-            self,
-            hidden_states,
-            layer_past=None,
-            attention_mask=None,
-            head_mask=None,
-            encoder_hidden_states=None,
-            encoder_attention_mask=None,
-            use_cache=False,
-            output_attentions=False,
+        self,
+        hidden_states,
+        layer_past=None,
+        attention_mask=None,
+        head_mask=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        use_cache=False,
+        output_attentions=False,
     ):
         if encoder_hidden_states is not None:
             assert hasattr(
                 self, "q_attn"
             ), "If class is used as cross attention, the weights `q_attn` have to be defined. Please make sure to instantiate class with `Attention(..., is_cross_attention=True)`."
             query = self.q_attn(hidden_states)
-            key, value = self.c_attn(encoder_hidden_states).split(self.split_size, dim=2)
+            key, value = self.c_attn(encoder_hidden_states).split(
+                self.split_size, dim=2
+            )
             attention_mask = encoder_attention_mask
         else:
             query, key, value = self.c_attn(hidden_states).split(self.split_size, dim=2)
@@ -224,14 +247,23 @@ class Attention(nn.Module):
         value = self.split_heads(value)
         if layer_past is not None:
             # https://github.com/ChunyuanLI/Optimus/blob/master/code/pytorch_transformers/modeling_gpt2.py#L189-L196
-            past_key, past_value = layer_past[0][0], layer_past[0][1]  # transpose back cf below
+            past_key, past_value = (
+                layer_past[0][0],
+                layer_past[0][1],
+            )  # transpose back cf below
 
             past_key = self.split_heads(past_key, k=True)
             past_value = self.split_heads(past_value)
             key = torch.cat((past_key, key), dim=-1)
             value = torch.cat((past_value, value), dim=-2)
 
-            past_attn = torch.LongTensor([0] * query.shape[0]).unsqueeze(1).unsqueeze(2).unsqueeze(3).to(query.device)
+            past_attn = (
+                torch.LongTensor([0] * query.shape[0])
+                .unsqueeze(1)
+                .unsqueeze(2)
+                .unsqueeze(3)
+                .to(query.device)
+            )
 
             if attention_mask is not None:
                 attention_mask = torch.cat([past_attn, attention_mask], dim=-1)
@@ -239,10 +271,14 @@ class Attention(nn.Module):
             # 32 x 128 x 129
 
         if use_cache is True:
-            present = torch.stack((key.transpose(-2, -1), value))  # transpose to have same shapes for stacking
+            present = torch.stack(
+                (key.transpose(-2, -1), value)
+            )  # transpose to have same shapes for stacking
         else:
             present = (None,)
-        attn_outputs = self._attn(query, key, value, attention_mask, head_mask, output_attentions)
+        attn_outputs = self._attn(
+            query, key, value, attention_mask, head_mask, output_attentions
+        )
         a = attn_outputs[0]
 
         a = self.merge_heads(a)
@@ -262,20 +298,24 @@ class Block(nn.Module):
         self.attn = Attention(hidden_size, n_ctx, config, scale)
         self.ln_2 = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
         if config.add_cross_attention:
-            self.crossattention = Attention(hidden_size, n_ctx, config, scale, is_cross_attention=True)
-            self.ln_cross_attn = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
+            self.crossattention = Attention(
+                hidden_size, n_ctx, config, scale, is_cross_attention=True
+            )
+            self.ln_cross_attn = nn.LayerNorm(
+                hidden_size, eps=config.layer_norm_epsilon
+            )
         self.mlp = GPT2MLP(inner_dim, config)
 
     def forward(
-            self,
-            hidden_states,
-            layer_past=None,
-            attention_mask=None,
-            head_mask=None,
-            encoder_hidden_states=None,
-            encoder_attention_mask=None,
-            use_cache=False,
-            output_attentions=False,
+        self,
+        hidden_states,
+        layer_past=None,
+        attention_mask=None,
+        head_mask=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        use_cache=False,
+        output_attentions=False,
     ):
         attn_outputs = self.attn(
             self.ln_1(hidden_states),
@@ -306,7 +346,9 @@ class Block(nn.Module):
             attn_output = cross_attn_outputs[0]
             # residual connection
             hidden_states = hidden_states + attn_output
-            outputs = outputs + cross_attn_outputs[1:]  # add cross attentions if we output attention weights
+            outputs = (
+                outputs + cross_attn_outputs[1:]
+            )  # add cross attentions if we output attention weights
 
         feed_forward_hidden_states = self.mlp(self.ln_2(hidden_states))
         # residual connection
@@ -323,12 +365,16 @@ class OptimusGPT2(GPT2PreTrainedModel):
         self.wte = nn.Embedding(config.vocab_size, config.n_embd)
         self.wpe = nn.Embedding(config.n_positions, config.n_embd)
         self.drop = nn.Dropout(config.embd_pdrop)
-        self.h = nn.ModuleList([Block(config.n_ctx, config, scale=True) for _ in range(config.n_layer)])
+        self.h = nn.ModuleList(
+            [Block(config.n_ctx, config, scale=True) for _ in range(config.n_layer)]
+        )
         self.ln_f = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
 
         # https://github.com/ChunyuanLI/Optimus/blob/master/code/pytorch_transformers/modeling_gpt2.py#L364-L370
         self.latent_dim = latent_dim
-        self.linear_mem = nn.Linear(self.latent_dim, config.hidden_size * config.n_layer, bias=False)
+        self.linear_mem = nn.Linear(
+            self.latent_dim, config.hidden_size * config.n_layer, bias=False
+        )
         self.linear_emb = nn.Linear(self.latent_dim, config.hidden_size, bias=False)
 
         self.init_weights()
@@ -347,23 +393,23 @@ class OptimusGPT2(GPT2PreTrainedModel):
             self.h[layer].attn.prune_heads(heads)
 
     def forward(
-            self,
-            input_ids=None,
-            past_key_values=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            encoder_hidden_states=None,
-            encoder_attention_mask=None,
-            use_cache=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None,
-            latent_as_gpt_emb=False,
-            latent_as_gpt_memory=False,
-            **kwargs,
+        self,
+        input_ids=None,
+        past_key_values=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        latent_as_gpt_emb=False,
+        latent_as_gpt_memory=False,
+        **kwargs,
     ):
         if "past" in kwargs:
             warnings.warn(
@@ -373,15 +419,25 @@ class OptimusGPT2(GPT2PreTrainedModel):
             past_key_values = kwargs.pop("past")
         assert kwargs == {}, f"Unexpected keyword arguments: {list(kwargs.keys())}."
 
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
+        )
         output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+            raise ValueError(
+                "You cannot specify both input_ids and inputs_embeds at the same time"
+            )
         elif input_ids is not None:
             input_shape = input_ids.size()
             input_ids = input_ids.view(-1, input_shape[-1])
@@ -403,12 +459,16 @@ class OptimusGPT2(GPT2PreTrainedModel):
         else:
             # https://github.com/ChunyuanLI/Optimus/blob/master/code/pytorch_transformers/modeling_gpt2.py#L394-L415
             if latent_as_gpt_emb:
-                past_emb = self.linear_emb(past_key_values[0])  # used as embeddings to add on other three embeddings
+                past_emb = self.linear_emb(
+                    past_key_values[0]
+                )  # used as embeddings to add on other three embeddings
 
             if latent_as_gpt_memory:
                 if len(past_key_values) == 1:
                     memory = self.linear_mem(past_key_values[0])
-                    memory_split = torch.split(memory.unsqueeze(1), self.config.hidden_size, dim=2)
+                    memory_split = torch.split(
+                        memory.unsqueeze(1), self.config.hidden_size, dim=2
+                    )
                     past_key_values_head = list(zip(memory_split, memory_split))
                     past_key_values = (past_key_values_head,) + past_key_values[1:]
 
@@ -420,7 +480,12 @@ class OptimusGPT2(GPT2PreTrainedModel):
 
         if position_ids is None:
             device = input_ids.device if input_ids is not None else inputs_embeds.device
-            position_ids = torch.arange(past_length, input_shape[-1] + past_length, dtype=torch.long, device=device)
+            position_ids = torch.arange(
+                past_length,
+                input_shape[-1] + past_length,
+                dtype=torch.long,
+                device=device,
+            )
             position_ids = position_ids.unsqueeze(0).view(-1, input_shape[-1])
 
         # Attention mask.
@@ -439,13 +504,19 @@ class OptimusGPT2(GPT2PreTrainedModel):
             # positions we want to attend and -10000.0 for masked positions.
             # Since we are adding it to the raw scores before the softmax, this is
             # effectively the same as removing these entirely.
-            attention_mask = attention_mask.to(dtype=next(self.parameters()).dtype)  # fp16 compatibility
+            attention_mask = attention_mask.to(
+                dtype=next(self.parameters()).dtype
+            )  # fp16 compatibility
             attention_mask = (1.0 - attention_mask) * -10000.0
 
         # If a 2D ou 3D attention mask is provided for the cross-attention
         # we need to make broadcastabe to [batch_size, num_heads, seq_length, seq_length]
         if self.config.add_cross_attention and encoder_hidden_states is not None:
-            encoder_batch_size, encoder_sequence_length, _ = encoder_hidden_states.size()
+            (
+                encoder_batch_size,
+                encoder_sequence_length,
+                _,
+            ) = encoder_hidden_states.size()
             encoder_hidden_shape = (encoder_batch_size, encoder_sequence_length)
             if encoder_attention_mask is None:
                 encoder_attention_mask = torch.ones(encoder_hidden_shape, device=device)
@@ -479,14 +550,19 @@ class OptimusGPT2(GPT2PreTrainedModel):
         all_hidden_states = () if output_hidden_states else None
         for i, (block, layer_past) in enumerate(zip(self.h, past_key_values)):
             if output_hidden_states:
-                all_hidden_states = all_hidden_states + (hidden_states.view(*output_shape),)
+                all_hidden_states = all_hidden_states + (
+                    hidden_states.view(*output_shape),
+                )
 
             if getattr(self.config, "gradient_checkpointing", False):
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
                         # checkpointing only works with tuple returns, not with lists
-                        return tuple(output for output in module(*inputs, use_cache, output_attentions))
+                        return tuple(
+                            output
+                            for output in module(*inputs, use_cache, output_attentions)
+                        )
 
                     return custom_forward
 
@@ -526,7 +602,11 @@ class OptimusGPT2(GPT2PreTrainedModel):
             all_hidden_states = all_hidden_states + (hidden_states,)
 
         if not return_dict:
-            return tuple(v for v in [hidden_states, presents, all_hidden_states, all_attentions] if v is not None)
+            return tuple(
+                v
+                for v in [hidden_states, presents, all_hidden_states, all_attentions]
+                if v is not None
+            )
 
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
@@ -552,8 +632,7 @@ class OptimusDecoder(GPT2LMHeadModel):
         """ Make sure we are sharing the input and output embeddings.
             Export to TorchScript can't handle parameter sharing so we are cloning them instead.
         """
-        self._tie_or_clone_weights(self.lm_head,
-                                   self.transformer.wte)
+        self._tie_or_clone_weights(self.lm_head, self.transformer.wte)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -564,7 +643,9 @@ class OptimusDecoder(GPT2LMHeadModel):
         past_key_values = kwargs["past_key_values"][0]
         if past_key_values.size(0) != num_total:  # For beam search
             batch_size, latent_dim = past_key_values.size()
-            past_key_values = past_key_values.unsqueeze(1).expand(batch_size, num_total // batch_size, latent_dim)
+            past_key_values = past_key_values.unsqueeze(1).expand(
+                batch_size, num_total // batch_size, latent_dim
+            )
             past_key_values = past_key_values.contiguous().view(num_total, latent_dim)
         return {
             "input_ids": input_ids,
@@ -574,24 +655,24 @@ class OptimusDecoder(GPT2LMHeadModel):
         }
 
     def forward(
-            self,
-            input_ids=None,
-            past_key_values=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            encoder_hidden_states=None,
-            encoder_attention_mask=None,
-            labels=None,
-            use_cache=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None,
-            latent_as_gpt_emb=False,
-            latent_as_gpt_memory=False,
-            **kwargs,
+        self,
+        input_ids=None,
+        past_key_values=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        labels=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+        latent_as_gpt_emb=False,
+        latent_as_gpt_memory=False,
+        **kwargs,
     ):
         r"""
         labels (:obj:`torch.LongTensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
@@ -608,7 +689,9 @@ class OptimusDecoder(GPT2LMHeadModel):
             )
             past_key_values = kwargs.pop("past")
         assert kwargs == {}, f"Unexpected keyword arguments: {list(kwargs.keys())}."
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         transformer_outputs = self.transformer(
             input_ids,
@@ -638,7 +721,9 @@ class OptimusDecoder(GPT2LMHeadModel):
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
             loss_fct = CrossEntropyLoss(reduction="mean", ignore_index=self.pad_id)
-            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            loss = loss_fct(
+                shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
+            )
             # bz = labels.size(0)
             # loss = losses[shift_labels.view(-1) != self.pad_id].sum() / bz
 

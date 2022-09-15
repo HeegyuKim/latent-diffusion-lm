@@ -10,10 +10,12 @@ import torch.nn as nn
 
 from .util import load_tokenizer, build_model
 
-AVAILABLE_MODELS = {"megagonlabs/bimeanvae-yelp",
-                    "megagonlabs/bimeanvae-amzn",
-                    "megagonlabs/optimus-yelp",
-                    "megagonlabs/optimus-amzn"}
+AVAILABLE_MODELS = {
+    "megagonlabs/bimeanvae-yelp",
+    "megagonlabs/bimeanvae-amzn",
+    "megagonlabs/optimus-yelp",
+    "megagonlabs/optimus-amzn",
+}
 
 
 class VAE(nn.Module):
@@ -38,7 +40,9 @@ class VAE(nn.Module):
                 config = json.load(open(model_dir / "config.json"))
                 config["device"] = self.device
                 model_path = model_dir / "pytorch_model.bin"
-                state_dict = torch.load(model_path, map_location=lambda storage, loc: storage)
+                state_dict = torch.load(
+                    model_path, map_location=lambda storage, loc: storage
+                )
 
             finally:
                 # Clean-up
@@ -48,11 +52,18 @@ class VAE(nn.Module):
             assert str(model_name_or_path) in AVAILABLE_MODELS, AVAILABLE_MODELS
             # Lazy import
             from huggingface_hub import hf_hub_url, cached_download
+
             config_url = hf_hub_url(str(model_name_or_path), filename="config.json")
-            config = json.load(open(cached_download(url=config_url, library_name="coop")))
-            model_url = hf_hub_url(str(model_name_or_path), filename="pytorch_model.bin")
+            config = json.load(
+                open(cached_download(url=config_url, library_name="coop"))
+            )
+            model_url = hf_hub_url(
+                str(model_name_or_path), filename="pytorch_model.bin"
+            )
             model_path = cached_download(url=model_url, library_name="coop")
-            state_dict = torch.load(model_path, map_location=lambda storage, loc: storage)
+            state_dict = torch.load(
+                model_path, map_location=lambda storage, loc: storage
+            )
 
             if "bimeanvae" in str(model_name_or_path):
                 spm_url = hf_hub_url(str(model_name_or_path), filename="spm.model")
@@ -65,9 +76,7 @@ class VAE(nn.Module):
         self.model.to(self.device)
 
     @torch.no_grad()
-    def encode(self,
-               reviews: Union[List[str], str],
-               device: str = None):
+    def encode(self, reviews: Union[List[str], str], device: str = None):
         if isinstance(reviews, str):
             reviews = [reviews]
 
@@ -77,11 +86,13 @@ class VAE(nn.Module):
         return self.model(src).q.loc
 
     @torch.no_grad()
-    def generate(self,
-                 z: torch.Tensor,
-                 num_beams: int = 4,
-                 max_tokens: int = 256,
-                 bad_words: Union[str, List[str], List[int]] = None):
+    def generate(
+        self,
+        z: torch.Tensor,
+        num_beams: int = 4,
+        max_tokens: int = 256,
+        bad_words: Union[str, List[str], List[int]] = None,
+    ):
         if z.dim() == 1:
             z = z.unsqueeze(0)
 
@@ -95,8 +106,11 @@ class VAE(nn.Module):
         else:
             bad_words_ids = None
 
-        return self.tgt_tokenizers.decode(self.model.generate(
-            z=z,
-            num_beams=num_beams,
-            max_tokens=max_tokens,
-            bad_words_ids=bad_words_ids))
+        return self.tgt_tokenizers.decode(
+            self.model.generate(
+                z=z,
+                num_beams=num_beams,
+                max_tokens=max_tokens,
+                bad_words_ids=bad_words_ids,
+            )
+        )

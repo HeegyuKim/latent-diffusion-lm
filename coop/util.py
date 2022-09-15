@@ -9,19 +9,30 @@ from .models import BiMeanVAE, Optimus
 from .reader import ReviewDataset, ReviewTest, OptimusDataset, OptimusTest
 from .tokenizer import Tokenizer, SpmTokenizer, BERTTokenizer, GPT2Tokenizer
 
-R1 = rouge.Rouge(metrics=["rouge-n"], max_n=1, limit_length=False, apply_avg=True, stemming=True,
-                 ensure_compatibility=True)
+R1 = rouge.Rouge(
+    metrics=["rouge-n"],
+    max_n=1,
+    limit_length=False,
+    apply_avg=True,
+    stemming=True,
+    ensure_compatibility=True,
+)
 BAD_WORDS = ["I", "i", "My", "my", "Me", "me", "We", "we", "Our", "our", "us"]
 
 
 def powerset(size):
     # https://docs.python.org/3/library/itertools.html#itertools-recipes
-    return list(map(list, chain.from_iterable(combinations(range(size), r + 1) for r in range(size))))
+    return list(
+        map(
+            list,
+            chain.from_iterable(combinations(range(size), r + 1) for r in range(size)),
+        )
+    )
 
 
 def get_logger(log_dir: Path):
     fmt = "'%(asctime)s - %(levelname)s - %(name)s -   %(message)s'"
-    datefmt = '%m/%d/%Y %H:%M:%S'
+    datefmt = "%m/%d/%Y %H:%M:%S"
     logging.basicConfig(format=fmt, datefmt=datefmt, level=logging.INFO)
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -45,11 +56,17 @@ def load_tokenizer(config: dict):
         src_tokenizer = BERTTokenizer(config.get("device"))
         tgt_tokenizer = GPT2Tokenizer(config.get("device"))
     else:
-        src_tokenizer = tgt_tokenizer = SpmTokenizer(config["spm_path"], config.get("device"))
+        src_tokenizer = tgt_tokenizer = SpmTokenizer(
+            config["spm_path"], config.get("device")
+        )
         config["model"]["vocab_size"] = src_tokenizer.vocab_size
-    config["model"].update({"pad_id": tgt_tokenizer.pad_id,
-                            "bos_id": tgt_tokenizer.bos_id,
-                            "eos_id": tgt_tokenizer.eos_id})
+    config["model"].update(
+        {
+            "pad_id": tgt_tokenizer.pad_id,
+            "bos_id": tgt_tokenizer.bos_id,
+            "eos_id": tgt_tokenizer.eos_id,
+        }
+    )
     return src_tokenizer, tgt_tokenizer
 
 
@@ -57,9 +74,21 @@ def load_data(config: dict, src_tokenizer: Tokenizer, tgt_tokenizer: Tokenizer =
     model_type = config["model"]["type"]
     data_dir = Path(config["data_dir"])
     if model_type == "optimus":
-        train = OptimusDataset(data_dir / "train.jsonl", src_tokenizer=src_tokenizer, tgt_tokenizer=tgt_tokenizer)
-        dev = OptimusTest(data_dir / "dev.json", src_tokenizer=src_tokenizer, tgt_tokenizer=tgt_tokenizer)
-        test = OptimusTest(data_dir / "test.json", src_tokenizer=src_tokenizer, tgt_tokenizer=tgt_tokenizer)
+        train = OptimusDataset(
+            data_dir / "train.jsonl",
+            src_tokenizer=src_tokenizer,
+            tgt_tokenizer=tgt_tokenizer,
+        )
+        dev = OptimusTest(
+            data_dir / "dev.json",
+            src_tokenizer=src_tokenizer,
+            tgt_tokenizer=tgt_tokenizer,
+        )
+        test = OptimusTest(
+            data_dir / "test.json",
+            src_tokenizer=src_tokenizer,
+            tgt_tokenizer=tgt_tokenizer,
+        )
     else:
         train = ReviewDataset(data_dir / "train.jsonl", tokenizer=src_tokenizer)
         dev = ReviewTest(data_dir / "dev.json", tokenizer=src_tokenizer)

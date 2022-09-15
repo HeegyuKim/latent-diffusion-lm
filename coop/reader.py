@@ -18,9 +18,7 @@ def get_length(fp):
 
 
 class ReviewDataset(Dataset):
-    def __init__(self,
-                 data_file,
-                 tokenizer: Tokenizer):
+    def __init__(self, data_file, tokenizer: Tokenizer):
         super().__init__()
         assert Path(data_file).exists(), f"Data directory, {data_file}, does not exist."
         self.data_file = str(data_file)
@@ -38,21 +36,20 @@ class ReviewDataset(Dataset):
 
     def collate_fn(self, data: List[torch.Tensor]):
         tensor, reviews = zip(*data)
-        tensor = pad_sequence(tensor, batch_first=True, padding_value=self.tokenizer.pad_id)
+        tensor = pad_sequence(
+            tensor, batch_first=True, padding_value=self.tokenizer.pad_id
+        )
         if torch.cuda.is_available():
             tensor = tensor.cuda()
         return {"src": tensor, "tgt": tensor, "reviews": reviews}
 
 
 class OptimusDataset(Dataset):
-    def __init__(self,
-                 data_file,
-                 src_tokenizer: Tokenizer,
-                 tgt_tokenizer: Tokenizer):
+    def __init__(self, data_file, src_tokenizer: Tokenizer, tgt_tokenizer: Tokenizer):
         super().__init__()
         assert Path(data_file).exists(), f"Data directory, {data_file}, does not exist."
         self.data_file = str(data_file)
-        self.pad, self.bos, self.eos = '<PAD>', '<BOS>', '<EOS>'
+        self.pad, self.bos, self.eos = "<PAD>", "<BOS>", "<EOS>"
 
         self.src_tokenizer = src_tokenizer
         self.tgt_tokenizer = self.tokenizer = tgt_tokenizer
@@ -73,9 +70,7 @@ class OptimusDataset(Dataset):
 
 
 class ReviewTest(Dataset):
-    def __init__(self,
-                 data_file,
-                 tokenizer: Tokenizer):
+    def __init__(self, data_file, tokenizer: Tokenizer):
         super().__init__()
         assert Path(data_file).exists(), f"Data directory, {data_file}, does not exist."
         self.data = json.load(open(data_file))
@@ -95,14 +90,11 @@ class ReviewTest(Dataset):
 
 
 class OptimusTest(Dataset):
-    def __init__(self,
-                 data_file,
-                 src_tokenizer: Tokenizer,
-                 tgt_tokenizer: Tokenizer):
+    def __init__(self, data_file, src_tokenizer: Tokenizer, tgt_tokenizer: Tokenizer):
         super().__init__()
         assert Path(data_file).exists(), f"Data directory, {data_file}, does not exist."
         self.data = json.load(open(data_file))
-        self.pad, self.bos, self.eos = '<PAD>', '<BOS>', '<EOS>'
+        self.pad, self.bos, self.eos = "<PAD>", "<BOS>", "<EOS>"
 
         self.src_tokenizer = src_tokenizer
         self.tgt_tokenizer = self.tokenizer = tgt_tokenizer

@@ -19,8 +19,15 @@ MAX_REV_LEN = 128
 def strip_text(s: str) -> str:
     # https://stackoverflow.com/a/518232/2809427
     # https://stackoverflow.com/a/8689826
-    return re.sub(" +", " ", "".join(c for c in unicodedata.normalize("NFD", s)
-                                     if unicodedata.category(c) != "Mn" and c in PRINTABLE).replace("\n", " "))
+    return re.sub(
+        " +",
+        " ",
+        "".join(
+            c
+            for c in unicodedata.normalize("NFD", s)
+            if unicodedata.category(c) != "Mn" and c in PRINTABLE
+        ).replace("\n", " "),
+    )
 
 
 def yelp(file_path: str, spm: SentencePieceProcessor = None):
@@ -28,10 +35,12 @@ def yelp(file_path: str, spm: SentencePieceProcessor = None):
     for ins in tqdm(map(json.loads, open(file_path)), desc="Yelp"):
         rating = int(ins["stars"])
         text = strip_text(ins["text"])
-        x = {"business_id": ins["business_id"],
-             "review_id": ins["review_id"],
-             "rating": rating,
-             "text": text}
+        x = {
+            "business_id": ins["business_id"],
+            "review_id": ins["review_id"],
+            "rating": rating,
+            "text": text,
+        }
         if spm is not None:
             piece = spm.Encode(text)
             if MIN_REV_LEN <= len(piece) <= MAX_REV_LEN:
@@ -51,14 +60,18 @@ def amzn(dir_path: str, spm: SentencePieceProcessor = None):
     for fp in Path(dir_path).glob("*.gz"):
         p.set_description(desc=fp.stem)
         d = defaultdict(list)
-        for ins in filter(lambda x: x["asin"] not in obs, map(json.loads, gzip.open(fp, "rb"))):
+        for ins in filter(
+            lambda x: x["asin"] not in obs, map(json.loads, gzip.open(fp, "rb"))
+        ):
             text = strip_text(ins["reviewText"])
             rating = int(float(ins["overall"]))
             review_id = ins["reviewerID"]
-            x = {"business_id": ins["asin"],
-                 "review_id": review_id,
-                 "rating": rating,
-                 "text": text}
+            x = {
+                "business_id": ins["asin"],
+                "review_id": review_id,
+                "rating": rating,
+                "text": text,
+            }
             if spm is not None:
                 piece = spm.Encode(text)
                 if MIN_REV_LEN <= len(piece) <= MAX_REV_LEN:
@@ -76,7 +89,9 @@ def amzn(dir_path: str, spm: SentencePieceProcessor = None):
 
 
 @click.command()
-@click.argument("data_type", type=click.Choice(("yelp", "amzn")), )
+@click.argument(
+    "data_type", type=click.Choice(("yelp", "amzn")),
+)
 @click.argument("raw_file", type=click.Path(exists=True))
 def main(data_type, raw_file):
     spm_file = Path(f"./data/sentencepiece/{data_type}.model")
@@ -97,5 +112,5 @@ def main(data_type, raw_file):
         print(json.dumps(x))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

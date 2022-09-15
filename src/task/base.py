@@ -11,7 +11,6 @@ from torch.utils.data import random_split
 import pytorch_lightning as pl
 
 
-
 class BaseTask(BaseModel, pl.LightningModule):
     config: DictConfig
 
@@ -29,13 +28,12 @@ class BaseTask(BaseModel, pl.LightningModule):
             return optim.Adam(self.parameters(), lr=oc.learning_rate)
         else:
             raise Exception(f"{oc.cls} is unsupported optimizer type.")
-    
+
     def get_scheduler(self):
         return None
 
     def configure_optimizers(self):
         return self.get_optimizer(), self.get_scheduler()
-
 
     def get_train_dataset(self) -> Dataset:
         pass
@@ -45,7 +43,7 @@ class BaseTask(BaseModel, pl.LightningModule):
 
     # def log_dict(self, *args, **kwargs):
     #     prefix = kwargs.get("prefix", None)
-        
+
     #     if prefix is not None:
     #         kwargs["dictionary"] = {prefix + k:v for k, v in kwargs["dictionary"].items()}
 
@@ -56,7 +54,7 @@ class BaseTask(BaseModel, pl.LightningModule):
             self.get_train_dataset(),
             batch_size=self.config.trainer.train_batch_size,
             shuffle=self.config.trainer.get("shuffle", True),
-            num_workers=self.config.trainer.get("num_workers", 4)
+            num_workers=self.config.trainer.get("num_workers", 4),
         )
 
     def val_dataloader(self):
@@ -65,7 +63,7 @@ class BaseTask(BaseModel, pl.LightningModule):
             return DataLoader(
                 dataset,
                 batch_size=self.config.trainer.eval_batch_size,
-                num_workers=self.config.trainer.get("num_workers", 4)
+                num_workers=self.config.trainer.get("num_workers", 4),
             )
         else:
             return None
@@ -79,7 +77,5 @@ class BaseTask(BaseModel, pl.LightningModule):
         else:
             task = cls.load_from_checkpoint(ckpt)
 
-        trainer = pl.Trainer(
-            max_epochs=config.trainer.train_epochs
-        )
+        trainer = pl.Trainer(max_epochs=config.trainer.train_epochs)
         trainer.fit(task)

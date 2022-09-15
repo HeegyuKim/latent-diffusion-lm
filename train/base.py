@@ -33,19 +33,18 @@ def get_model(config: DictConfig):
 
     if mc.cls == "optimus":
         return Optimus(
-            latent_dim=mc.latent_dim,
-            bos_id=50256,
-            pad_id=50256,
-            eos_id=50256
+            latent_dim=mc.latent_dim, bos_id=50256, pad_id=50256, eos_id=50256
         )
     else:
         raise Exception(f"{mc.cls} is unsupported model type.")
+
 
 def get_dataset_split(config: Optional[DictConfig]):
     if config is None:
         return None
 
     return load_dataset(**config)
+
 
 def get_dataset(config: DictConfig):
     dc = config.dataset
@@ -55,6 +54,7 @@ def get_dataset(config: DictConfig):
 
     return out
 
+
 def get_trainer(config: DictConfig):
     return pl.Trainer(
         gpus=1 if torch.cuda.is_available() else 0,
@@ -62,8 +62,8 @@ def get_trainer(config: DictConfig):
         log_every_n_steps=1,
     )
 
+
 class BaseLitModule(pl.LightningModule):
-    
     def __init__(self, config: DictConfig):
         super().__init__()
         self.save_hyperparameters()
@@ -74,4 +74,3 @@ class BaseLitModule(pl.LightningModule):
         optim = get_optimizer(self.config, self.parameters())
         sched = get_scheduler(self.config)
         return optim, sched
-

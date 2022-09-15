@@ -16,7 +16,6 @@ from datasets import load_dataset
 
 
 class OptimusTask(BaseTask):
-
     def setup(self, config: DictConfig):
         self.enc_tok = AutoTokenizer.from_pretrained("bert-base-cased")
         self.dec_tok = AutoTokenizer.from_pretrained("gpt2")
@@ -25,7 +24,7 @@ class OptimusTask(BaseTask):
             config.model.latent_dim,
             -100,
             self.dec_tok.eos_token_id,
-            self.dec_tok.eos_token_id
+            self.dec_tok.eos_token_id,
         )
 
     def get_train_dataset(self) -> Dataset:
@@ -41,7 +40,7 @@ class OptimusTask(BaseTask):
             decoder_eos_token_id=self.dec_tok.eos_token_id,
             decoder_pad_token_id=self.dec_tok.eos_token_id,
         )
-    
+
     def get_eval_dataset(self) -> Dataset:
         return OptimusDataset(
             load_dataset(self.config.dataset.train.dataset_name, split="test[:10%]"),
@@ -56,7 +55,6 @@ class OptimusTask(BaseTask):
             decoder_pad_token_id=self.dec_tok.eos_token_id,
         )
 
-    
     def step(self, batch, batch_idx) -> dict:
         src = {
             "input_ids": batch["source_input_ids"],
@@ -68,28 +66,21 @@ class OptimusTask(BaseTask):
             "attention_mask": batch["target_attention_mask"],
             "labels": batch["target_labels"],
         }
-        loss = self.model(
-            src=src,
-            tgt=tgt
-        )    
+        loss = self.model(src=src, tgt=tgt)
 
         nll, zkl, zkl_real = loss.nll, loss.zkl, loss.zkl_real
-        klw = self.model.klw(self.global_step, self.config.trainer.optimus_checkout_step)
+        klw = self.model.klw(
+            self.global_step, self.config.trainer.optimus_checkout_step
+        )
         loss = nll + klw * zkl
 
-        return {
-            "loss": loss,
-            "nll": nll,
-            "zkl": zkl,
-            "zkl_real": zkl_real
-        }
+        return {"loss": loss, "nll": nll, "zkl": zkl, "zkl_real": zkl_real}
 
     def training_step(self, batch, batch_idx) -> dict:
         return self.step(batch, batch_idx)
 
     def validation_step(self, batch, batch_idx) -> dict:
         return self.step(batch, batch_idx)
-        
 
     # def on_validation_epoch_end(self) -> None:
     #     return super().on_validation_epoch_end()

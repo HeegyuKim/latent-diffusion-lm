@@ -7,5 +7,6 @@ from omegaconf import DictConfig
 def main(config: DictConfig):
     OptimusTask.main(config)
 
+
 if __name__ == "__main__":
     main()

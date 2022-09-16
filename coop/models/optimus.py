@@ -6,10 +6,21 @@ from transformers.models.gpt2.modeling_gpt2 import *
 
 import torch
 import torch.nn as nn
+from torch.distributions import Normal
 
 from . import Model
 from .util import Losses, VAEOut
 import warnings
+from typing import NamedTuple
+
+
+class OptimusOutput(NamedTuple):
+    latent: Normal
+    nll: Optional[torch.Tensor]
+    zkl: Optional[torch.Tensor]
+    zkl_real: Optional[torch.Tensor]
+    decoder_output: Optional[BaseModelOutputWithPastAndCrossAttentions]
+
 
 PAD, BOS, EOS = "<PAD>", "<BOS>", "<EOS>"
 SPECIAL = {"pad_token": PAD, "bos_token": BOS, "eos_token": EOS}
@@ -50,11 +61,10 @@ class Optimus(Model):
         self,
         src: Dict[str, torch.Tensor],
         tgt: Dict[str, torch.Tensor] = None,
-        do_generate: torch.Tensor = False,
-        num_beams: int = 4,
-        **kwargs,
+        encoder_kwargs: Optional[dict] = {},
+        decoder_kwargs: Optional[dict] = {},
     ):
-        cls_vec = self.encoder(**src).pooler_output
+        cls_vec = self.encoder(**src, **encoder_kwargs).pooler_output
         mu, log_var = torch.chunk(self.proj(cls_vec), chunks=2, dim=-1)
         std = torch.exp(0.5 * log_var)
         q = Normal(mu, std)
@@ -65,23 +75,23 @@ class Optimus(Model):
         zkl = zkl_real[kl_mask].sum() / bz
         zkl_real = zkl_real.sum(dim=-1).mean()
 
-        if self.training:
-            assert tgt is not None
-            z = q.rsample()
+        if tgt is not None:
+            latent = q.rsample()
             outputs = self.decoder(
                 **tgt,
-                past_key_values=(z,),
+                past_key_values=(latent,),
                 latent_as_gpt_memory=True,
                 latent_as_gpt_emb=True,
+                **decoder_kwargs,
             )
-            return Losses(nll=outputs.loss, zkl=zkl, zkl_real=zkl_real)
+            nll = outputs.loss
         else:
-            if do_generate:
-                z = q.mean
-                generated = self.generate(z, num_beams=num_beams)
-            else:
-                generated = None
-            return VAEOut(q=q, generated=generated)
+            outputs = None
+            latent = None
+
+        return OptimusOutput(
+            latent=latent, nll=nll, zkl=zkl, zkl_real=zkl_real, decoder_output=outputs
+        )
 
     @torch.no_grad()
     def generate(
@@ -622,7 +632,6 @@ class OptimusDecoder(GPT2LMHeadModel):
     def __init__(self, config, latent_dim, pad_id):
         super().__init__(config)
         self.transformer = OptimusGPT2(config, latent_dim=latent_dim)
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         self.pad_id = pad_id
 
         self.init_weights()

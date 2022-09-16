@@ -1,9 +1,11 @@
+from dataclasses import dataclass
 from typing import Any, Optional, Sequence, Union
 from pydantic import BaseModel
 
 import torch
 from torch.utils.data import Dataset
-from transformers import PreTrainedTokenizer
+from transformers import PreTrainedTokenizer, PreTrainedTokenizerBase
+from transformers.utils.generic import PaddingStrategy
 from tokenizers import Tokenizer
 
 

@@ -2,3 +2,5 @@ defaults:
 - base
 
 optimus_checkout_step: 2000
+project: optimus
+run_name: bert/gpt2

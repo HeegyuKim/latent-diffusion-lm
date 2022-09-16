@@ -1,5 +1,6 @@
 defaults:
-- dataset: yelp_polarity
+- dataset: yelp_polarity_mini
 - model: optimus
 - optimizer: adam
-- trainer: base
+- trainer: optimus-base
+- logger: wandb

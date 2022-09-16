@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable, Mapping, Optional, Union
 from pydantic import BaseModel
 from omegaconf import DictConfig
 
@@ -9,17 +9,27 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data import random_split
 import pytorch_lightning as pl
+from pytorch_lightning.loggers import WandbLogger
 
 
-class BaseTask(BaseModel, pl.LightningModule):
+def get_logger(config):
+    name = config.logger.name
+
+    if name == "wandb":
+        return WandbLogger(
+            name=config.trainer.run_name, project=config.trainer.project,
+        )
+    else:
+        raise Exception(f"{name} is invalid logger")
+
+
+class BaseTask(pl.LightningModule):
     config: DictConfig
 
-    def __init__(__pydantic_self__, **data: Any) -> None:
-        super().__init__(**data)
-        __pydantic_self__.setup(__pydantic_self__.config)
-
-    def setup(self, config: DictConfig):
-        pass
+    def __init__(self, config: DictConfig) -> None:
+        super().__init__()
+        self.save_hyperparameters()
+        self.config = config
 
     def get_optimizer(self):
         oc = self.config.optimizer
@@ -33,21 +43,57 @@ class BaseTask(BaseModel, pl.LightningModule):
         return None
 
     def configure_optimizers(self):
-        return self.get_optimizer(), self.get_scheduler()
+        opt = self.get_optimizer()
+        sched = self.get_scheduler()
+        if sched is not None:
+            return [opt], [sched]
+        else:
+            return opt
 
     def get_train_dataset(self) -> Dataset:
         pass
 
+    def get_train_collator(self) -> Callable:
+        return None
+
     def get_eval_dataset(self) -> Dataset:
         return None
 
-    # def log_dict(self, *args, **kwargs):
-    #     prefix = kwargs.get("prefix", None)
+    def get_eval_collator(self) -> Callable:
+        return None
 
-    #     if prefix is not None:
-    #         kwargs["dictionary"] = {prefix + k:v for k, v in kwargs["dictionary"].items()}
-
-    #     super().log_dict(*args, **kwargs)
+    def log_dict(
+        self,
+        dictionary: Mapping,
+        prog_bar: bool = False,
+        logger: bool = True,
+        on_step: Optional[bool] = None,
+        on_epoch: Optional[bool] = None,
+        reduce_fx: Union[str, Callable] = "mean",
+        enable_graph: bool = False,
+        sync_dist: bool = False,
+        sync_dist_group: Optional[Any] = None,
+        add_dataloader_idx: bool = True,
+        batch_size: Optional[int] = None,
+        rank_zero_only: bool = False,
+        prefix: Optional[str] = None,
+    ) -> None:
+        if prefix is not None:
+            dictionary = {prefix + k: v for k, v in dictionary.items()}
+        super().log_dict(
+            dictionary,
+            prog_bar,
+            logger,
+            on_step,
+            on_epoch,
+            reduce_fx,
+            enable_graph,
+            sync_dist,
+            sync_dist_group,
+            add_dataloader_idx,
+            batch_size,
+            rank_zero_only,
+        )
 
     def train_dataloader(self):
         return DataLoader(
@@ -55,6 +101,7 @@ class BaseTask(BaseModel, pl.LightningModule):
             batch_size=self.config.trainer.train_batch_size,
             shuffle=self.config.trainer.get("shuffle", True),
             num_workers=self.config.trainer.get("num_workers", 4),
+            collate_fn=self.get_train_collator(),
         )
 
     def val_dataloader(self):
@@ -64,6 +111,7 @@ class BaseTask(BaseModel, pl.LightningModule):
                 dataset,
                 batch_size=self.config.trainer.eval_batch_size,
                 num_workers=self.config.trainer.get("num_workers", 4),
+                collate_fn=self.get_eval_collator(),
             )
         else:
             return None
@@ -73,9 +121,16 @@ class BaseTask(BaseModel, pl.LightningModule):
         ckpt = config.get("checkpoint", None)
 
         if ckpt is None:
-            task = cls(config)
+            task = cls(config=config)
         else:
             task = cls.load_from_checkpoint(ckpt)
 
-        trainer = pl.Trainer(max_epochs=config.trainer.train_epochs)
+        trainer = pl.Trainer(
+            logger=get_logger(config),
+            accelerator=config.trainer.get("accelerator", "gpu"),
+            devices=config.trainer.get("devices", 1),
+            max_epochs=config.trainer.get("train_epochs", None),
+            max_steps=config.trainer.get("train_steps", -1),
+            log_every_n_steps=config.trainer.get("log_every_n_steps", 1),
+        )
         trainer.fit(task)

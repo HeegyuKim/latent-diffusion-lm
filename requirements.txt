@@ -16,3 +16,4 @@ omegaconf
 hydra-core
 pytorch-lightning
 pydantic
+silence_tensorflow 

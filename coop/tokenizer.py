@@ -158,5 +158,8 @@ class GPT2Tokenizer(Tokenizer):
             ids = ids.tolist()
         return [
             x.strip()
-            for x in self.tokenizer.batch_decode(ids, skip_special_tokens=True,)
+            for x in self.tokenizer.batch_decode(
+                ids,
+                skip_special_tokens=True,
+            )
         ]

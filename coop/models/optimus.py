@@ -638,8 +638,8 @@ class OptimusDecoder(GPT2LMHeadModel):
         self.tie_weights()
 
     def tie_weights(self):
-        """ Make sure we are sharing the input and output embeddings.
-            Export to TorchScript can't handle parameter sharing so we are cloning them instead.
+        """Make sure we are sharing the input and output embeddings.
+        Export to TorchScript can't handle parameter sharing so we are cloning them instead.
         """
         self._tie_or_clone_weights(self.lm_head, self.transformer.wte)
 
@@ -730,9 +730,12 @@ class OptimusDecoder(GPT2LMHeadModel):
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
             loss_fct = CrossEntropyLoss(reduction="sum", ignore_index=self.pad_id)
-            loss = loss_fct(
-                shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
-            ) / labels.shape[0]
+            loss = (
+                loss_fct(
+                    shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
+                )
+                / labels.shape[0]
+            )
             # bz = labels.size(0)
             # loss = losses[shift_labels.view(-1) != self.pad_id].sum() / bz
 

@@ -121,4 +121,3 @@ class OptimusTask(BaseTask):
             table.add_data(text, generated)
 
         wandb.log({"sample": table})
-        

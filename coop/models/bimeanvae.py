@@ -64,7 +64,11 @@ class BiMeanVAE(Model):
             nn.Linear(hidden_size, embedding_dim),
             nn.Linear(embedding_dim, vocab_size, bias=True),
         )
-        self.beam = BeamSearch(self.eos_id, max_steps=128, beam_size=4,)
+        self.beam = BeamSearch(
+            self.eos_id,
+            max_steps=128,
+            beam_size=4,
+        )
         self.bad_words = set()
         # Tying weight
         self.output_layer[-1].weight = self.embed.weight

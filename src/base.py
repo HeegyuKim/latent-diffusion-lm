@@ -83,7 +83,7 @@ class BaseTrainer:
 
     def train_step(self, batch: Dict) -> Dict:
         """
-            loss 는 무조건 있어야한다.
+        loss 는 무조건 있어야한다.
         """
         pass
 

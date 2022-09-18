@@ -17,7 +17,8 @@ def get_logger(config):
 
     if name == "wandb":
         return WandbLogger(
-            name=config.trainer.run_name, project=config.trainer.project,
+            name=config.trainer.run_name,
+            project=config.trainer.project,
         )
     else:
         raise Exception(f"{name} is invalid logger")
@@ -126,9 +127,9 @@ class BaseTask(pl.LightningModule):
             task = cls.load_from_checkpoint(ckpt)
 
         checkpoint = pl.callbacks.ModelCheckpoint(
-            dirpath='./checkpoint/',
+            dirpath="./checkpoint/",
             filename=f"{config.trainer.project}-{config.trainer.run_name}",
-            )
+        )
         trainer = pl.Trainer(
             logger=get_logger(config),
             accelerator=config.trainer.get("accelerator", "gpu"),
@@ -137,6 +138,6 @@ class BaseTask(pl.LightningModule):
             max_steps=config.trainer.get("train_steps", -1),
             log_every_n_steps=config.trainer.get("log_every_n_steps", 1),
             val_check_interval=config.trainer.get("val_check_interval", None),
-            callbacks=[checkpoint]
+            callbacks=[checkpoint],
         )
         trainer.fit(task)

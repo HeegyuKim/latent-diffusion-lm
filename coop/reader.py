@@ -64,7 +64,9 @@ class OptimusDataset(Dataset):
         return x
 
     def collate_fn(self, data: List[str]):
-        src = self.src_tokenizer(data,)
+        src = self.src_tokenizer(
+            data,
+        )
         tgt = self.tgt_tokenizer(data)
         return {"src": src, "tgt": tgt, "reviews": data}
 

@@ -129,5 +129,9 @@ def oracle(ins):
 
 
 def input_output_overlap(inputs, output):
-    r1 = rouge.Rouge(metrics=["rouge-n"], max_n=1, limit_length=False,)
+    r1 = rouge.Rouge(
+        metrics=["rouge-n"],
+        max_n=1,
+        limit_length=False,
+    )
     return r1.get_scores(output, inputs)["rouge-1"]["f"]

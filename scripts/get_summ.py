@@ -61,7 +61,8 @@ def yelp(output_dir):
 
 @click.command()
 @click.argument(
-    "data_type", type=click.Choice(("yelp", "amzn")),
+    "data_type",
+    type=click.Choice(("yelp", "amzn")),
 )
 @click.argument("data_dir", type=click.Path())
 def main(data_type, data_dir):

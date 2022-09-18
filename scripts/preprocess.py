@@ -90,7 +90,8 @@ def amzn(dir_path: str, spm: SentencePieceProcessor = None):
 
 @click.command()
 @click.argument(
-    "data_type", type=click.Choice(("yelp", "amzn")),
+    "data_type",
+    type=click.Choice(("yelp", "amzn")),
 )
 @click.argument("raw_file", type=click.Path(exists=True))
 def main(data_type, raw_file):

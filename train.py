@@ -43,7 +43,12 @@ class Trainer:
         self.model = model
         self.train, self.dev, self.test = data
 
-        self.opt = Adam(self.model.parameters(), lr, betas=(0.5, 0.999), eps=1e-6,)
+        self.opt = Adam(
+            self.model.parameters(),
+            lr,
+            betas=(0.5, 0.999),
+            eps=1e-6,
+        )
 
         self.scheduler = get_linear_schedule_with_warmup(
             self.opt, checkout_step // 10, num_steps

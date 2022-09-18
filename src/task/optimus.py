@@ -2,7 +2,7 @@ from typing import Any, Callable, Optional
 from .base import BaseTask
 from omegaconf import DictConfig
 from coop.models import Optimus
-
+import pandas as pd
 import torch
 import torch.optim as optim
 from torch import nn
@@ -16,6 +16,13 @@ from datasets import load_dataset
 from omegaconf import OmegaConf
 
 from ..dataset.optimus import OptimusDataset, OptimusCollator
+import wandb
+
+
+def switch_dict_tensor_device(d: dict, device: str):
+    for k, v in d.items():
+        if torch.is_tensor(v) and v.device != device:
+            d[k] = v.to(device)
 
 
 class OptimusTask(BaseTask):
@@ -67,7 +74,6 @@ class OptimusTask(BaseTask):
             "attention_mask": batch["tgt_attention_mask"],
             "labels": batch["tgt_labels"],
         }
-        print(src, tgt)
         return self.model(src=src, tgt=tgt)
 
     def training_step(self, batch, batch_idx) -> dict:
@@ -78,7 +84,6 @@ class OptimusTask(BaseTask):
             self.global_step, self.config.trainer.optimus_checkout_step
         )
         loss = nll + klw * zkl
-        self.log("loss", loss, prog_bar=True, on_step=True)
 
         out = {"loss": loss, "nll": nll, "zkl": zkl, "zkl_real": zkl_real, "klw": klw}
         self.log_dict(out, prefix="train_")
@@ -92,5 +97,28 @@ class OptimusTask(BaseTask):
         self.log_dict(out, prefix="eval_")
         return out
 
-    # def on_validation_epoch_end(self) -> None:
-    #     return super().on_validation_epoch_end()
+    def on_validation_epoch_end(self) -> None:
+        texts = """
+        this food is amazing!!
+        this food is delicious
+        this food is disgusting
+        omg what a wonderful restaurant 
+        """.strip().split(
+            "\n"
+        )
+        table = wandb.Table(columns=["source", "generated"])
+
+        for text in texts:
+            inputs = self.enc_tok(text.strip(), return_tensors="pt")
+            switch_dict_tensor_device(inputs, self.device)
+
+            latent = self.model(src=inputs).latent.mean
+            generated = self.model.generate(
+                latent, max_tokens=64, min_length=4, no_repeat_ngram_size=2, num_beams=5
+            )[0]
+            generated = self.dec_tok.decode(generated)
+            # print(text.strip(), "->", self.dec_tok.decode(generated))
+            table.add_data(text, generated)
+
+        wandb.log({"sample": table})
+        

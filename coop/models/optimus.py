@@ -33,7 +33,7 @@ class Optimus(Model):
         pad_id: int,
         bos_id: int,
         eos_id: int,
-        free_bit: float = 0.05,
+        free_bit: float = 2.0,
     ):
         encoder = BertModel.from_pretrained("bert-base-cased", return_dict=True)
         super().__init__(encoder.config.hidden_size, latent_dim)
@@ -87,10 +87,10 @@ class Optimus(Model):
             nll = outputs.loss
         else:
             outputs = None
-            latent = None
+            nll = None
 
         return OptimusOutput(
-            latent=latent, nll=nll, zkl=zkl, zkl_real=zkl_real, decoder_output=outputs
+            latent=q, nll=nll, zkl=zkl, zkl_real=zkl_real, decoder_output=outputs
         )
 
     @torch.no_grad()
@@ -268,7 +268,7 @@ class Attention(nn.Module):
             value = torch.cat((past_value, value), dim=-2)
 
             past_attn = (
-                torch.LongTensor([0] * query.shape[0])
+                torch.LongTensor([1] * query.shape[0])
                 .unsqueeze(1)
                 .unsqueeze(2)
                 .unsqueeze(3)
@@ -729,10 +729,10 @@ class OptimusDecoder(GPT2LMHeadModel):
             shift_logits = lm_logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
-            loss_fct = CrossEntropyLoss(reduction="mean", ignore_index=self.pad_id)
+            loss_fct = CrossEntropyLoss(reduction="sum", ignore_index=self.pad_id)
             loss = loss_fct(
                 shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
-            )
+            ) / labels.shape[0]
             # bz = labels.size(0)
             # loss = losses[shift_labels.view(-1) != self.pad_id].sum() / bz
 

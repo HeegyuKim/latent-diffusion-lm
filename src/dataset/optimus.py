@@ -11,11 +11,11 @@ from tokenizers import Tokenizer
 
 
 def map_to_tokenizer(
-    dataset, column, tokenizer, max_seq_len: int, add_bos_token: bool = False
+    dataset, column, tokenizer, max_seq_len: int, add_bos_eos_token: bool = False
 ):
     def map_fn(x):
-        if add_bos_token:
-            text = [tokenizer.bos_token + t for t in x[column]]
+        if add_bos_eos_token:
+            text = [tokenizer.bos_token + t + tokenizer.eos_token for t in x[column]]
         else:
             text = x[column]
 

@@ -1,6 +1,8 @@
 defaults:
 - base
 
-optimus_checkout_step: 2000
+optimus_checkout_step: 2500
+
+val_check_interval: 0.1
 project: optimus
 run_name: bert/gpt2

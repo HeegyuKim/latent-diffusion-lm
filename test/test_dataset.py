@@ -17,7 +17,7 @@ dataset = OptimusDataset(
     dataset,
     encoder_tokenizer=enc_tok,
     decoder_tokenizer=dec_tok,
-    max_length=1024,
+    max_length=8,
     encoder_bos_token_id=enc_tok.cls_token_id,
     encoder_eos_token_id=enc_tok.sep_token_id,
     encoder_pad_token_id=enc_tok.pad_token_id,
@@ -28,9 +28,11 @@ dataset = OptimusDataset(
 
 for i in range(3):
     item = dataset[i]
+    # print(item)
     print(enc_tok.decode(item["source_input_ids"], skip_special_tokens=False))
     print(item["source_labels"])
     # print(enc_tok.decode(item['source_labels'], skip_special_tokens=False))
     print(dec_tok.decode(item["target_input_ids"], skip_special_tokens=False))
     # print(dec_tok.decode(item['target_labels'], skip_special_tokens=False))
     print(item["target_labels"])
+    print(item["source_attention_mask"])

@@ -3,4 +3,4 @@ train:
   split: "train"
 eval:
   path: "yelp_polarity"
-  split: "test"
+  split: "test[:1%]"

@@ -1,0 +1,5 @@
+model: optimus
+encoder: klue/bert-base
+decoder: skt/kogpt2-base-v2
+latent_dim: 512
+max_seq_len: 512

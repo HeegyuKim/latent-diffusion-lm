@@ -1,0 +1,10 @@
+train_batch_size: 8
+train_epochs: 50
+
+eval_batch_size: 8
+eval_strategy: epoch # or steps
+
+optimus_checkout_step: 12500
+val_check_interval: 0.5
+project: optimus
+run_name: aihub_conv

@@ -1,4 +1,4 @@
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional, Union
 from .base import BaseTask
 from omegaconf import DictConfig
 from coop.models import Optimus
@@ -16,6 +16,7 @@ from datasets import load_dataset
 from omegaconf import OmegaConf
 
 from ..dataset.optimus import OptimusDataset, OptimusCollator
+from tqdm import tqdm
 import wandb
 
 
@@ -29,8 +30,8 @@ class OptimusTask(BaseTask):
     def __init__(self, config: DictConfig) -> None:
         super().__init__(config)
         print(OmegaConf.to_yaml(config))
-        self.enc_tok = AutoTokenizer.from_pretrained("bert-base-cased")
-        self.dec_tok = AutoTokenizer.from_pretrained("gpt2")
+        self.enc_tok = AutoTokenizer.from_pretrained(config.model.encoder)
+        self.dec_tok = AutoTokenizer.from_pretrained(config.model.decoder)
         self.dec_tok.pad_token_id = self.dec_tok.eos_token_id
         self.dec_tok.bos_token_id = self.dec_tok.eos_token_id
 
@@ -39,6 +40,8 @@ class OptimusTask(BaseTask):
             -100,
             self.dec_tok.eos_token_id,
             self.dec_tok.eos_token_id,
+            config.model.encoder,
+            config.model.decoder
         )
 
     def get_train_collator(self) -> Callable:
@@ -62,6 +65,27 @@ class OptimusTask(BaseTask):
             self.dec_tok,
             self.config.model.max_seq_len,
         )
+
+    @torch.no_grad()
+    def encode(self, reviews: Union[List[str], str], device: str = None):
+        if isinstance(reviews, str):
+            reviews = [reviews]
+
+        if device is None:
+            self.to(self.device)
+
+        src = self.enc_tok(reviews, return_tensors="pt", padding=True)
+        return self.model(src).latent.loc
+        
+    @torch.no_grad()
+    def generate(self, latents: torch.Tensor, prompts: Optional[Union[str, List[str]]], device: str = None, **kwargs):
+        if prompts is not None:
+            input_ids = self.dec_tok(prompts, return_tensors="pt").input_ids
+        else:
+            input_ids = None
+        g = self.model.generate(z=latents, input_ids=input_ids, **kwargs)
+        return self.dec_tok.batch_decode(g)
+
 
     def step(self, batch, batch_idx) -> dict:
         src = {
@@ -98,26 +122,21 @@ class OptimusTask(BaseTask):
         return out
 
     def on_validation_epoch_end(self) -> None:
-        texts = """
-        this food is amazing!!
-        this food is delicious
-        this food is disgusting
-        omg what a wonderful restaurant 
-        """.strip().split(
-            "\n"
-        )
+        samples = self.config.dataset.get("generation_samples", None)
+        if samples is None:
+            return 
+
         table = wandb.Table(columns=["source", "generated"])
 
-        for text in texts:
-            inputs = self.enc_tok(text.strip(), return_tensors="pt")
+        for text in tqdm(samples, "generating samples..."):
+            inputs = self.enc_tok(text.strip(), return_tensors="pt", truncation=True, max_length=self.config.model.max_seq_len)
             switch_dict_tensor_device(inputs, self.device)
 
             latent = self.model(src=inputs).latent.mean
             generated = self.model.generate(
-                latent, max_tokens=64, min_length=4, no_repeat_ngram_size=2, num_beams=5
+                latent, max_tokens=self.config.model.max_seq_len, min_length=3, no_repeat_ngram_size=2, num_beams=5
             )[0]
             generated = self.dec_tok.decode(generated)
-            # print(text.strip(), "->", self.dec_tok.decode(generated))
             table.add_data(text, generated)
 
         wandb.log({"sample": table})

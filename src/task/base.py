@@ -136,8 +136,10 @@ class BaseTask(pl.LightningModule):
             devices=config.trainer.get("devices", 1),
             max_epochs=config.trainer.get("train_epochs", None),
             max_steps=config.trainer.get("train_steps", -1),
+            limit_train_batches=config.trainer.get("limit_train_batches"),
             log_every_n_steps=config.trainer.get("log_every_n_steps", 1),
             val_check_interval=config.trainer.get("val_check_interval", None),
+            num_sanity_val_steps=0,
             callbacks=[checkpoint],
         )
         trainer.fit(task)

@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from torch.distributions import Normal, kl_divergence
 from transformers import BertModel
@@ -33,13 +33,15 @@ class Optimus(Model):
         pad_id: int,
         bos_id: int,
         eos_id: int,
+        encoder_name: str = "bert-base-cased",
+        decoder_name: str = "gpt2",
         free_bit: float = 2.0,
     ):
-        encoder = BertModel.from_pretrained("bert-base-cased", return_dict=True)
+        encoder = BertModel.from_pretrained(encoder_name, return_dict=True)
         super().__init__(encoder.config.hidden_size, latent_dim)
         self.encoder = encoder
         self.decoder = OptimusDecoder.from_pretrained(
-            "gpt2", latent_dim=latent_dim, pad_id=pad_id, return_dict=True
+            decoder_name, latent_dim=latent_dim, pad_id=pad_id, return_dict=True
         )
         self.decoder.resize_token_embeddings(
             self.decoder.config.vocab_size + len(SPECIAL)
@@ -97,15 +99,19 @@ class Optimus(Model):
     def generate(
         self,
         z: torch.Tensor,
+        input_ids: torch.Tensor=None,
         num_beams: int = 4,
         max_tokens: int = 256,
         min_length: int = 0,
         no_repeat_ngram_size: int = 2,
+        repetition_penalty: Optional[float] = None,
         bad_words_ids: List[int] = None,
     ):
         bz, _ = z.size()
 
-        input_ids = z.new_full((bz, 1), dtype=torch.long, fill_value=self.bos_id)
+        if input_ids is None:
+            input_ids = z.new_full((bz, 1), dtype=torch.long, fill_value=self.bos_id)
+
         generated = self.decoder.generate(
             input_ids,
             max_length=max_tokens,
@@ -117,6 +123,7 @@ class Optimus(Model):
             eos_token_id=self.eos_id,
             past_key_values=(z,),
             no_repeat_ngram_size=no_repeat_ngram_size,
+            repetition_penalty=repetition_penalty,
             latent_as_gpt_memory=True,
             latent_as_gpt_emb=True,
         ).tolist()

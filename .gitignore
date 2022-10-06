@@ -1,3 +1,5 @@
+*.faiss
+latent512.hfds/
 .vs/
 *.pt
 outputs/

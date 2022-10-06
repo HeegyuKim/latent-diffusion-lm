@@ -74,7 +74,7 @@ class OptimusTask(BaseTask):
         if device is None:
             self.to(self.device)
 
-        src = self.enc_tok(reviews, return_tensors="pt", padding=True)
+        src = self.enc_tok(reviews, return_tensors="pt", padding=True, truncation=True, max_length=512)
         return self.model(src).latent.loc
         
     @torch.no_grad()
@@ -83,8 +83,9 @@ class OptimusTask(BaseTask):
             input_ids = self.dec_tok(prompts, return_tensors="pt").input_ids
         else:
             input_ids = None
-        g = self.model.generate(z=latents, input_ids=input_ids, **kwargs)
-        return self.dec_tok.batch_decode(g)
+        generations = self.model.generate(z=latents, input_ids=input_ids, **kwargs)
+        generations = [[x for x in g if x >= 0] for g in generations]
+        return self.dec_tok.batch_decode(generations)
 
 
     def step(self, batch, batch_idx) -> dict:
@@ -134,7 +135,7 @@ class OptimusTask(BaseTask):
 
             latent = self.model(src=inputs).latent.mean
             generated = self.model.generate(
-                latent, max_tokens=self.config.model.max_seq_len, min_length=3, no_repeat_ngram_size=2, num_beams=5
+                latent, max_length=self.config.model.max_seq_len, min_length=3, no_repeat_ngram_size=2, num_beams=5
             )[0]
             generated = self.dec_tok.decode(generated)
             table.add_data(text, generated)

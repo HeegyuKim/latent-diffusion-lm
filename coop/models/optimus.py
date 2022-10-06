@@ -100,12 +100,7 @@ class Optimus(Model):
         self,
         z: torch.Tensor,
         input_ids: torch.Tensor=None,
-        num_beams: int = 4,
-        max_tokens: int = 256,
-        min_length: int = 0,
-        no_repeat_ngram_size: int = 2,
-        repetition_penalty: Optional[float] = None,
-        bad_words_ids: List[int] = None,
+        **kwargs
     ):
         bz, _ = z.size()
 
@@ -114,18 +109,13 @@ class Optimus(Model):
 
         generated = self.decoder.generate(
             input_ids,
-            max_length=max_tokens,
-            min_length=min_length,
-            num_beams=num_beams,
-            bad_words_ids=bad_words_ids,
             bos_token_id=self.bos_id,
             pad_token_id=self.pad_id,
             eos_token_id=self.eos_id,
             past_key_values=(z,),
-            no_repeat_ngram_size=no_repeat_ngram_size,
-            repetition_penalty=repetition_penalty,
             latent_as_gpt_memory=True,
             latent_as_gpt_emb=True,
+            **kwargs
         ).tolist()
         return generated
 

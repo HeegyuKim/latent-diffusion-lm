@@ -4,6 +4,9 @@ silence_tensorflow()
 from src.task.optimus_v2 import OptimusTask
 import hydra
 from omegaconf import DictConfig
+import os
+
+os.environ["HYDRA_FULL_ERROR"] = "1"
 
 
 @hydra.main("../config", "optimus_v2.yaml")

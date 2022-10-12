@@ -84,7 +84,8 @@ class OptimusTask(BaseTask):
 
     def get_eval_dataset(self) -> Dataset:
         return OptimusDataset(
-            load_dataset("csv", data_files="../../../data/optimus_v2_val.csv", split="train"),
+            # load_dataset("csv", data_files="../../../data/optimus_v2_val.csv", split="train"),
+            load_dataset("heegyu/vae_eval", split="test", use_auth_token=True),
             self.tokenizer,
             self.config.model.max_seq_len,
             "sentence"
@@ -99,14 +100,20 @@ class OptimusTask(BaseTask):
             self.to(self.device)
 
         src = self.tokenizer(reviews, return_tensors="pt", padding=True, truncation=True, max_length=self.config.model.max_seq_len)
+        switch_dict_tensor_device(src, self.device)
+
         return self.model(src).latent.loc
         
     @torch.no_grad()
-    def generate(self, latents: torch.Tensor, prompts: Optional[Union[str, List[str]]], device: str = None, **kwargs):
+    def generate(self, latents: torch.Tensor, prompts: Optional[Union[str, List[str]]] = None, device: str = None, **kwargs):
+        if device is None:
+            self.to(self.device)
+
         if prompts is not None:
-            input_ids = self.tokenizer(prompts, return_tensors="pt").input_ids
+            input_ids = self.tokenizer(prompts, return_tensors="pt").input_ids.to(self.device)
         else:
             input_ids = None
+            
         generations = self.model.generate(z=latents, input_ids=input_ids, **kwargs)
         generations = [[x for x in g if x >= 0] for g in generations]
         return self.tokenizer.batch_decode(generations)
@@ -148,24 +155,21 @@ class OptimusTask(BaseTask):
 
         out = {"loss": nll + zkl, "nll": nll, "zkl": zkl, "zkl_real": zkl_real}
         self.log_dict(out, prefix="eval_")
-        return out
+        
+        input_sents = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
+        input_latents = self.encode(input_sents)
+        output_sents = self.generate(input_latents, min_length=3, num_beams=4)
 
-    def on_validation_epoch_end(self) -> None:
-        samples = pd.read_csv("../../../data/optimus_v2_val.csv").sentence
-        if samples is None:
-            return 
+        return {
+            "source": input_sents,
+            "generated": output_sents
+        }
 
+    def validation_epoch_end(self, validation_step_outputs) -> None:
         table = wandb.Table(columns=["source", "generated"])
 
-        for text in tqdm(samples, "generating samples..."):
-            inputs = self.tokenizer(text.strip(), return_tensors="pt", padding=False, truncation=True, max_length=self.config.model.max_seq_len)
-            switch_dict_tensor_device(inputs, self.device)
-
-            latent = self.model(src=inputs).latent.mean
-            generated = self.model.generate(
-                latent, max_length=self.config.model.max_seq_len, min_length=3, no_repeat_ngram_size=2, num_beams=5
-            )[0]
-            generated = self.tokenizer.decode(generated)
-            table.add_data(text, generated)
+        for batch in validation_step_outputs:
+            for src, gen in zip(batch["source"], batch["generated"]):
+                table.add_data(src, gen)
 
         wandb.log({"sample": table})

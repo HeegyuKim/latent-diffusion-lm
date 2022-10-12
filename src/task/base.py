@@ -101,7 +101,7 @@ class BaseTask(pl.LightningModule):
             self.get_train_dataset(),
             batch_size=self.config.trainer.train_batch_size,
             shuffle=self.config.trainer.get("shuffle", True),
-            num_workers=self.config.trainer.get("num_workers", 4),
+            num_workers=self.config.trainer.get("num_workers", 1),
             collate_fn=self.get_train_collator(),
         )
 
@@ -111,7 +111,7 @@ class BaseTask(pl.LightningModule):
             return DataLoader(
                 dataset,
                 batch_size=self.config.trainer.eval_batch_size,
-                num_workers=self.config.trainer.get("num_workers", 4),
+                num_workers=self.config.trainer.get("num_workers", 1),
                 collate_fn=self.get_eval_collator(),
             )
         else:

@@ -1,0 +1,13 @@
+train_batch_size: 32
+train_steps: 1000000
+# accelerator: cpu # cpu for test, gpu default
+
+shuffle: false
+eval_batch_size: 8
+eval_strategy: epoch # or steps
+
+optimus_checkout_step: 20000
+val_check_interval: 10000
+project: optimus
+run_name: v2-mini-ae
+num_sanity_val_steps: 1

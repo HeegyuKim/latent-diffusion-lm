@@ -5,6 +5,7 @@ latent512.hfds/
 outputs/
 checkpoint/
 data/
+wandb/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

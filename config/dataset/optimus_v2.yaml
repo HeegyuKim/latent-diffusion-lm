@@ -1,0 +1,8 @@
+train:
+  - heegyu/kowiki-sentences
+  - heegyu/namuwiki-sentences
+  
+test:
+  path: "csv"
+  data_files: ../../../data/optimus_v2_val.csv
+  split: "train"

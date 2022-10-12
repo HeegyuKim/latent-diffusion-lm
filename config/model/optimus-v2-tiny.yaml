@@ -1,0 +1,8 @@
+model: optimus
+tokenizer: klue/roberta-base
+encoder: roberta-tiny.json
+decoder: gpt2-tiny.json
+latent_dim: 512
+max_seq_len: 64
+free_bit: 2.0
+is_vae: true

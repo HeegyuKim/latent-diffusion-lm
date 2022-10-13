@@ -15,6 +15,7 @@ from tokenizers import Tokenizer
 from datasets import load_dataset, interleave_datasets
 
 from omegaconf import OmegaConf
+from hydra.utils import get_original_cwd, to_absolute_path
 
 from ..dataset.optimus_v2 import OptimusDataset, OptimusIterableDataset
 from tqdm import tqdm
@@ -30,14 +31,13 @@ def switch_dict_tensor_device(d: dict, device: str):
 class OptimusTask(BaseTask):
     def __init__(self, config: DictConfig) -> None:
         super().__init__(config)
-        print(OmegaConf.to_yaml(config))
         self.tokenizer = AutoTokenizer.from_pretrained(config.model.tokenizer)
         
-        self.encoder_config = RobertaConfig.from_json_file("../../../config/model/" + config.model.encoder)
-        self.decoder_config = GPT2Config.from_json_file("../../../config/model/" + config.model.decoder)
+        self.encoder_config = RobertaConfig.from_json_file(to_absolute_path("config/model/" + config.model.encoder))
+        self.decoder_config = GPT2Config.from_json_file(to_absolute_path("config/model/" + config.model.decoder))
         self.model = Optimus(
             config.model.latent_dim,
-            -100,
+            self.tokenizer.pad_token_id,
             self.tokenizer.bos_token_id,
             self.tokenizer.eos_token_id,
             self.encoder_config,
@@ -61,8 +61,12 @@ class OptimusTask(BaseTask):
 
     def get_train_dataset(self) -> Dataset:
         ds = []
+        def filter_text(x):
+            return len(x) >= 10 and len(x) <= 256 and "뉴시스" not in x and "재배포" not in x
+
         for name in self.config.dataset.train:
-            d = load_dataset(name, split="train", streaming=True)
+            d = load_dataset(name, split="train", streaming=True, use_auth_token=True)
+            d = d.filter(lambda x: filter_text(x["sentence"]))
             ds.append(d)
 
         if len(ds) == 1:
@@ -158,7 +162,7 @@ class OptimusTask(BaseTask):
         
         input_sents = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
         input_latents = self.encode(input_sents)
-        output_sents = self.generate(input_latents, min_length=3, num_beams=4)
+        output_sents = self.generate(input_latents, min_length=3, num_beams=4, max_length=self.config.model.max_seq_len)
 
         return {
             "source": input_sents,

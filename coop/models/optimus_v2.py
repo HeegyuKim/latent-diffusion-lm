@@ -124,7 +124,7 @@ class Optimus(Model):
 
     @staticmethod
     def klw(step: int, interval: int, r: float = 0.75, t: float = 0.5, s: int = 10):
-        if step * s >= step:
+        if step >= s * interval:
             return 1.0
         value = (step % interval) / interval
         klw = max(min((value - t) / (r - t), 1.0), 0.0)

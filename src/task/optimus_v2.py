@@ -162,7 +162,7 @@ class OptimusTask(BaseTask):
         
         input_sents = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
         input_latents = self.encode(input_sents)
-        output_sents = self.generate(input_latents, min_length=3, num_beams=4, max_length=self.config.model.max_seq_len)
+        output_sents = self.generate(input_latents, min_length=3, num_beams=4, max_length=self.config.model.max_seq_len, skip_special_tokens=True)
 
         return {
             "source": input_sents,

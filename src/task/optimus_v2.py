@@ -2,6 +2,7 @@ from typing import Any, Callable, List, Optional, Union
 from .base import BaseTask
 from omegaconf import DictConfig
 from coop.models.optimus_v2 import Optimus
+from coop.metric import levenshtein_batch
 from transformers import RobertaConfig, GPT2Config
 import pandas as pd
 import torch
@@ -120,7 +121,7 @@ class OptimusTask(BaseTask):
             
         generations = self.model.generate(z=latents, input_ids=input_ids, **kwargs)
         generations = [[x for x in g if x >= 0] for g in generations]
-        return self.tokenizer.batch_decode(generations)
+        return self.tokenizer.batch_decode(generations, skip_special_tokens=True)
 
 
     def step(self, batch, batch_idx) -> dict:
@@ -158,11 +159,13 @@ class OptimusTask(BaseTask):
         nll, zkl, zkl_real = loss.nll, loss.zkl, loss.zkl_real
 
         out = {"loss": nll + zkl, "nll": nll, "zkl": zkl, "zkl_real": zkl_real}
-        self.log_dict(out, prefix="eval_")
+        self.log_dict(out, prefix="eval_", on_epoch=True)
         
         input_sents = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
         input_latents = self.encode(input_sents)
-        output_sents = self.generate(input_latents, min_length=3, num_beams=4, max_length=self.config.model.max_seq_len, skip_special_tokens=True)
+        output_sents = self.generate(input_latents, min_length=3, num_beams=4, max_length=self.config.model.max_seq_len)
+        lev_dist_mean = levenshtein_batch(input_sents, output_sents)
+        self.log("eval_levenshtein_dist", lev_dist_mean, on_epoch=True)
 
         return {
             "source": input_sents,

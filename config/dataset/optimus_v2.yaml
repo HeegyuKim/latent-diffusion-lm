@@ -6,6 +6,4 @@ train:
   - heegyu/aihub_daily_conv_2022_sentences
   
 test:
-  path: "csv"
-  data_files: ../../../data/optimus_v2_val.csv
-  split: "train"
+  - "heegyu/vae_eval"

@@ -18,7 +18,7 @@ from datasets import load_dataset, interleave_datasets
 from omegaconf import OmegaConf
 from hydra.utils import get_original_cwd, to_absolute_path
 
-from ..dataset.optimus_v2 import OptimusDataset, OptimusIterableDataset
+from ..dataset.optimus_v2 import OptimusDataset, OptimusIterableDataset, OptimusPLMDataset
 from tqdm import tqdm
 import wandb
 
@@ -61,39 +61,18 @@ class OptimusTask(BaseTask):
             )
 
     def get_train_dataset(self) -> Dataset:
-        ds = []
-        def filter_text(x):
-            return len(x) >= 10 and len(x) <= 256 and "뉴시스" not in x and "재배포" not in x
-
-        for name in self.config.dataset.train:
-            d = load_dataset(name, split="train", streaming=True, use_auth_token=True)
-            d = d.filter(lambda x: filter_text(x["sentence"]))
-            ds.append(d)
-
-        if len(ds) == 1:
-            ds = ds[0]
-            return OptimusDataset(
-                ds,
-                self.tokenizer,
-                self.config.model.max_seq_len,
-                "sentence"
-            )
-        else:
-            ds = interleave_datasets(ds)
-            return OptimusIterableDataset(
-                ds,
-                self.tokenizer,
-                self.config.model.max_seq_len,
-                "sentence"
-            )
+        return OptimusPLMDataset(
+            self.config.dataset.train,
+            self.tokenizer,
+            self.config.model.max_seq_len
+        )
 
     def get_eval_dataset(self) -> Dataset:
-        return OptimusDataset(
-            # load_dataset("csv", data_files="../../../data/optimus_v2_val.csv", split="train"),
-            load_dataset("heegyu/vae_eval", split="test", use_auth_token=True),
+        return OptimusPLMDataset(
+            self.config.dataset.test,
             self.tokenizer,
             self.config.model.max_seq_len,
-            "sentence"
+            split="test"
         )
 
     @torch.no_grad()

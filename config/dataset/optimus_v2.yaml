@@ -4,8 +4,7 @@ train:
   - heegyu/aihub_web_2021
   - heegyu/aihub_spoken_2021
   - heegyu/aihub_daily_conv_2022_sentences
+train_weights: [10, 10, 10, 10, 4]
   
 test:
-  path: "csv"
-  data_files: ../../../data/optimus_v2_val.csv
-  split: "train"
+  - "heegyu/vae_eval"

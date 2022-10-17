@@ -64,7 +64,8 @@ class OptimusTask(BaseTask):
         return OptimusPLMDataset(
             self.config.dataset.train,
             self.tokenizer,
-            self.config.model.max_seq_len
+            self.config.model.max_seq_len,
+            weights=self.config.dataset.get("train_weights")
         )
 
     def get_eval_dataset(self) -> Dataset:

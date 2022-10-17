@@ -7,6 +7,14 @@ from transformers.utils import PaddingStrategy
 from datasets import load_dataset, interleave_datasets
 
 
+def normalize_weights(weights):
+    if weights is None:
+        return None
+        
+    s = sum(weights)
+    return [w / s for w in weights]
+
+
 @dataclass
 class OptimusDataset(Dataset):
     def __init__(
@@ -62,6 +70,7 @@ class OptimusPLMDataset(IterableDataset):
     tokenizer: PreTrainedTokenizer
     max_seq_len: int
     column: str = "sentence"
+    weights: Optional[List] = None
     split: str = "train"
 
     def __iter__(self) -> dict:
@@ -74,7 +83,7 @@ class OptimusPLMDataset(IterableDataset):
             d = d.filter(lambda x: filter_text(x["sentence"]))
             ds.append(d)
 
-        ds = interleave_datasets(ds)
+        ds = interleave_datasets(ds, probabilities=normalize_weights(self.weights))
 
         for item in ds:
             out = self.tokenizer(item[self.column], padding=False, truncation=True, max_length=self.max_seq_len)

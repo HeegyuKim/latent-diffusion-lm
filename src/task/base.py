@@ -140,6 +140,7 @@ class BaseTask(pl.LightningModule):
             log_every_n_steps=config.trainer.get("log_every_n_steps", 1),
             val_check_interval=config.trainer.get("val_check_interval", None),
             num_sanity_val_steps=config.trainer.get("num_sanity_val_steps", 0),
+            strategy="deepspeed_stage_2",
             callbacks=[checkpoint],
         )
         trainer.fit(task)

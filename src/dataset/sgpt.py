@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+<<<<<<< HEAD
 from typing import Any, List, Optional, Sequence, Union
 from transformers import PreTrainedTokenizer
 
@@ -105,3 +106,11 @@ class SGPTIterableDataset(IterableDataset):
                 "attention_mask": torch.LongTensor(attention_mask),
                 "labels": sents[1:]
             }
+=======
+from typing import Any, Optional, Sequence, Union
+from transformers import DataCollatorForSeq2Seq, DataCollatorWithPadding
+
+from torch.utils.data import Dataset, IterableDataset
+from transformers.utils import PaddingStrategy
+
+>>>>>>> 63760582b9e509998f1eea2666240595e0bc601e

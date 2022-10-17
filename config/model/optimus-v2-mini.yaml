@@ -4,5 +4,6 @@ encoder: roberta-mini.json
 decoder: gpt2-mini.json
 latent_dim: 512
 max_seq_len: 64
-free_bit: 1.0
-is_vae: false
+free_bit: 2.0
+use_plm: false
+is_vae: true

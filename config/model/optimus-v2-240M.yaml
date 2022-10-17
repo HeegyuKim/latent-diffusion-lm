@@ -1,0 +1,8 @@
+model: optimus
+encoder: klue/roberta-base
+decoder: skt/kogpt2-base-v2
+latent_dim: 768
+max_seq_len: 64
+free_bit: 2.0
+use_plm: true
+is_vae: true

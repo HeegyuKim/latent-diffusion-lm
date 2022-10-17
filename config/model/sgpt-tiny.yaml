@@ -1,0 +1,4 @@
+model: sgpt-tiny.json
+autoencoder: checkpoint/optimus-v2-44M/optimus-v2-tiny-vae.ckpt
+latent_dim: 512
+max_seq_len: 16

@@ -1,0 +1,5 @@
+train:
+  - heegyu/aihub_daily_conv_2022
+
+test:
+  - heegyu/aihub_daily_conv_2022

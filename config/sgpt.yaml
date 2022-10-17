@@ -1,0 +1,6 @@
+defaults:
+- optimizer: adam
+- logger: wandb
+- dataset: sgpt-conv
+- model: sgpt-tiny
+- trainer: sgpt-tiny

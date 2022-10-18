@@ -132,7 +132,7 @@ class BaseTask(pl.LightningModule):
         )
         trainer = pl.Trainer(
             logger=get_logger(config),
-            accelerator=config.trainer.get("accelerator", "gpu"),
+            accelerator=config.trainer.get("accelerator", "gpu" if torch.cuda.is_available() else 'cpu'),
             devices=config.trainer.get("devices", 1),
             max_epochs=config.trainer.get("train_epochs", None),
             max_steps=config.trainer.get("train_steps", -1),

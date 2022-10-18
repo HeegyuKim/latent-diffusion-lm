@@ -1,5 +1,5 @@
 defaults:
-- optimizer: adam
+- optimizer: adam-sgpt
 - logger: wandb
 - dataset: sgpt-conv
 - model: sgpt-tiny

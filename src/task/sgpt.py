@@ -67,12 +67,11 @@ class SGPTTask(BaseTask):
         outputs = F.mse_loss(hidden, batch["labels"], reduce=False).mean(-1)
         outputs = outputs.masked_fill(mask == 0, 0)
         loss = outputs.sum() / mask.sum()
-        print(loss)
 
-        return loss
+        return loss, hidden
 
     def training_step(self, batch, batch_idx) -> dict:
-        loss = self.step(batch, batch_idx)
+        loss, _ = self.step(batch, batch_idx)
 
         out = {"loss": loss}
         self.log_dict(out, prefix="train_")
@@ -80,8 +79,15 @@ class SGPTTask(BaseTask):
         return out
 
     def validation_step(self, batch, batch_idx) -> dict:
-        loss = self.step(batch, batch_idx)
+        loss, outputs = self.step(batch, batch_idx)
 
-        print(batch_idx)
         out = {"loss": loss}
         self.log_dict(out, prefix="val_", on_epoch=True)
+
+        # if batch_idx < 2:
+        #     print(batch["sentences"])
+        #     seq_lens = batch["attention_mask"].cpu().sum(-1)
+        #     for i, seq_len in enumerate(seq_lens):
+        #         recons = self.autoencoder.generate(outputs[i, :seq_len])
+        #         for src, rec in zip(batch["sentences"][i], recons):
+        #             print(batch_idx, i, src, rec)

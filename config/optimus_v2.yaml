@@ -5,5 +5,9 @@ defaults:
 # - model: optimus
 # - trainer: optimus-base
 - dataset: optimus_v2
-- model: optimus-v2-tiny
-- trainer: optimus-v2-tiny
+- model: optimus-v2-mini
+- trainer: optimus-v2-mini
+- _self_
+
+# trainer:
+#   resume_from_checkpoint: outputs/2022-10-17/00-28-23/checkpoint/optimus-v2-mini-vae.ckpt/checkpoint/mp_rank_00_model_states.pt

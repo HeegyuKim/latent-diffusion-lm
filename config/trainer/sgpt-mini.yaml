@@ -6,5 +6,5 @@ eval_batch_size: 32
 eval_strategy: epoch
 
 project: sgpt
-run_name: tiny-opt44M
+run_name: mini-opt44M
 num_sanity_val_steps: 1

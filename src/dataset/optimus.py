@@ -40,7 +40,8 @@ class OptimusPLMDataset(IterableDataset):
     column: str = "sentence"
     weights: Optional[List] = None
     split: str = "train"
-    decoder_special_token: str = "<|endoftext|>"
+    decoder_bos_token: str = "<s>"
+    decoder_eos_token: str = "</s>"
 
     def __iter__(self) -> dict:
         ds = []
@@ -56,7 +57,7 @@ class OptimusPLMDataset(IterableDataset):
 
         for item in ds:
             text = item[self.column]
-            dec_text = self.decoder_special_token + text + self.decoder_special_token
+            dec_text = self.decoder_bos_token + text + self.decoder_eos_token
             enc = self.encoder_tokenizer(text, padding=False, truncation=True, max_length=self.max_seq_len)
             dec = self.decoder_tokenizer(dec_text, padding=False, truncation=True, max_length=self.max_seq_len)
             

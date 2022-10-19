@@ -1,12 +1,12 @@
-optimus_checkout_step: 25000
 train_batch_size: 32
 train_steps: 1000000
 shuffle: false
 
-eval_batch_size: 32
+eval_batch_size: 8
 eval_strategy: steps
+optimus_checkout_step: 25000
 val_check_interval: 50000
-num_sanity_val_steps: 1
+num_sanity_val_steps: 0
 
 project: optimus
 run_name: v1-base

@@ -32,14 +32,14 @@ class OptimusTask(BaseTask):
         super().__init__(config)
         self.enc_tok = AutoTokenizer.from_pretrained(config.model.encoder)
         self.dec_tok = AutoTokenizer.from_pretrained(config.model.decoder)
-        if self.dec_tok.pad_token_id is None:
-            self.dec_tok.pad_token_id = config.model.decoder_special_token_id
+
+        self.dec_tok.add_special_tokens(config.model.get("decoder_special_tokens", {}))
 
         self.model = Optimus(
             config.model.latent_dim,
-            config.model.decoder_special_token_id,
-            config.model.decoder_special_token_id,
-            config.model.decoder_special_token_id,
+            self.dec_tok.pad_token_id,
+            self.dec_tok.bos_token_id,
+            self.dec_tok.eos_token_id,
             config.model.encoder,
             config.model.decoder,
             config.model.free_bit
@@ -57,7 +57,9 @@ class OptimusTask(BaseTask):
             self.enc_tok,
             self.dec_tok,
             self.config.model.max_seq_len,
-            weights=self.config.dataset.get("train_weights")
+            weights=self.config.dataset.get("train_weights"),
+            decoder_bos_token=self.dec_tok.bos_token,
+            decoder_eos_token=self.dec_tok.eos_token
         )
 
     def get_eval_dataset(self) -> Dataset:
@@ -66,7 +68,9 @@ class OptimusTask(BaseTask):
             self.enc_tok,
             self.dec_tok,
             self.config.model.max_seq_len,
-            split="test"
+            split="test",
+            decoder_bos_token=self.dec_tok.bos_token,
+            decoder_eos_token=self.dec_tok.eos_token
         )
 
     @torch.no_grad()
@@ -93,7 +97,7 @@ class OptimusTask(BaseTask):
             
         generations = self.model.generate(z=latents, input_ids=input_ids, **kwargs)
         generations = [[x for x in g if x >= 0] for g in generations]
-        return self.dec_tok.batch_decode(generations, skip_special_tokens=True)
+        return self.dec_tok.batch_decode(generations, skip_special_tokens=False)
 
 
     def step(self, batch, batch_idx) -> dict:
@@ -117,9 +121,9 @@ class OptimusTask(BaseTask):
             self.global_step, self.config.trainer.optimus_checkout_step
         )
         loss = nll + klw * zkl
-
+    
         out = {"loss": loss, "nll": nll, "zkl": zkl, "zkl_real": zkl_real, "klw": klw}
-        self.log_dict(out, prefix="train_")
+        self.log_dict(out, prefix="train_", prog_bar=True)
 
         if self.config.model.get("is_vae", True):
             return out

@@ -127,7 +127,7 @@ class OptimusTask(BaseTask):
         loss = nll + klw * zkl
 
         out = {"loss": loss, "nll": nll, "zkl": zkl, "zkl_real": zkl_real, "klw": klw}
-        self.log_dict(out, prefix="train_")
+        self.log_dict(out, prefix="train_", prog_bar=True)
 
         if self.config.model.get("is_vae", True):
             return out

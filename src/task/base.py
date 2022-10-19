@@ -1,5 +1,4 @@
 from typing import Any, Callable, Mapping, Optional, Union
-from pydantic import BaseModel
 from omegaconf import DictConfig
 
 import torch

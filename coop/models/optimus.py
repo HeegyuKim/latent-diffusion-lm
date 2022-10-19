@@ -37,14 +37,11 @@ class Optimus(Model):
         decoder_name: str = "gpt2",
         free_bit: float = 2.0,
     ):
-        encoder = BertModel.from_pretrained(encoder_name, return_dict=True)
+        encoder = RobertaModel.from_pretrained(encoder_name, return_dict=True)
         super().__init__(encoder.config.hidden_size, latent_dim)
         self.encoder = encoder
         self.decoder = OptimusDecoder.from_pretrained(
             decoder_name, latent_dim=latent_dim, pad_id=pad_id, return_dict=True
-        )
-        self.decoder.resize_token_embeddings(
-            self.decoder.config.vocab_size + len(SPECIAL)
         )
 
         self.latent_dim = latent_dim

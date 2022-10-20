@@ -23,6 +23,9 @@ class SentenceGPT(torch.nn.Module):
         super().__init__()
 
         self.model = GPT2Model(gpt2_config)
+        self.emb = nn.Linear(
+            latent_dim, gpt2_config.hidden_size, bias=False
+        )
         self.proj = nn.Linear(
             gpt2_config.hidden_size, 2 * latent_dim, 
             bias=False
@@ -60,8 +63,9 @@ class SentenceGPT(torch.nn.Module):
         attention_mask: Optional[torch.Tensor],
         compute_kldiv_loss: bool = False
     ) -> SentenceGPTOutput:
+        embs = self.emb(inputs_embeds)
         hidden = self.model(
-            inputs_embeds=inputs_embeds,
+            inputs_embeds=embs,
             attention_mask=attention_mask
             ).last_hidden_state
         

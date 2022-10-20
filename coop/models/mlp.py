@@ -16,6 +16,9 @@ class VAEMLP(torch.nn.Module):
             torch.nn.Linear(latent_dim, latent_dim),
             torch.nn.Linear(latent_dim, latent_dim),
             torch.nn.Linear(latent_dim, latent_dim),
+            torch.nn.Linear(latent_dim, latent_dim),
+            torch.nn.Linear(latent_dim, latent_dim),
+            torch.nn.Linear(latent_dim, latent_dim),
             torch.nn.Linear(latent_dim, latent_dim)
         )
         self.proj = nn.Linear(

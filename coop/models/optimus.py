@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
 from torch.distributions import Normal, kl_divergence
-from transformers import BertModel
+from transformers import BertModel, RobertaModel
 from transformers.models.gpt2.modeling_gpt2 import *
 
 import torch
@@ -37,14 +37,11 @@ class Optimus(Model):
         decoder_name: str = "gpt2",
         free_bit: float = 2.0,
     ):
-        encoder = BertModel.from_pretrained(encoder_name, return_dict=True)
+        encoder = RobertaModel.from_pretrained(encoder_name, return_dict=True)
         super().__init__(encoder.config.hidden_size, latent_dim)
         self.encoder = encoder
         self.decoder = OptimusDecoder.from_pretrained(
             decoder_name, latent_dim=latent_dim, pad_id=pad_id, return_dict=True
-        )
-        self.decoder.resize_token_embeddings(
-            self.decoder.config.vocab_size + len(SPECIAL)
         )
 
         self.latent_dim = latent_dim
@@ -131,7 +128,9 @@ class Optimus(Model):
         self.train()
 
     @staticmethod
-    def klw(step: int, interval: int, r: float = 0.75, t: float = 0.5, s: int = 100000):
+    def klw(step: int, interval: int, r: float = 0.75, t: float = 0.5, s: int = 10):	
+        if step >= s * interval:	
+            return 1.0
         value = (step % interval) / interval
         klw = max(min((value - t) / (r - t), 1.0), 0.0)
         return klw
@@ -626,10 +625,11 @@ class OptimusGPT2(GPT2PreTrainedModel):
 class OptimusDecoder(GPT2LMHeadModel):
     authorized_missing_keys = [r"h\.\d+\.attn\.masked_bias", r"lm_head\.weight"]
 
-    def __init__(self, config, latent_dim, pad_id):
+    def __init__(self, config, latent_dim, pad_id, label_for_pad_id=-100):
         super().__init__(config)
         self.transformer = OptimusGPT2(config, latent_dim=latent_dim)
         self.pad_id = pad_id
+        self.label_for_pad_id = label_for_pad_id
 
         self.init_weights()
         self.tie_weights()
@@ -726,7 +726,7 @@ class OptimusDecoder(GPT2LMHeadModel):
             shift_logits = lm_logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
-            loss_fct = CrossEntropyLoss(reduction="sum", ignore_index=self.pad_id)
+            loss_fct = CrossEntropyLoss(reduction="sum", ignore_index=self.label_for_pad_id)
             loss = (
                 loss_fct(
                     shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)

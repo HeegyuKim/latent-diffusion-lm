@@ -78,15 +78,15 @@ class SGPTTask(BaseTask):
         gpt2_config = GPT2Config.from_json_file(to_absolute_path("config/model/" + config.model.model))
         self.autoencoder = OptimusTask.load_from_checkpoint(to_absolute_path(config.model.autoencoder)).eval()
         freeze_model(self.autoencoder)
-        # self.model = SentenceGPT(
-        #     gpt2_config,
-        #     config.model.latent_dim,
-        #     config.model.free_bit
-        #     )
-        self.model = VAEMLP(
+        self.model = SentenceGPT(
+            gpt2_config,
             config.model.latent_dim,
             config.model.free_bit
-        )
+            )
+        # self.model = VAEMLP(
+        #     config.model.latent_dim,
+        #     config.model.free_bit
+        # )
 
     
     def get_train_collator(self) -> Callable:

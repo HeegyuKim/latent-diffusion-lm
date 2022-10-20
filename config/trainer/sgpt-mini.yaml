@@ -1,10 +1,13 @@
-train_batch_size: 256
-train_epochs: 3
+train_batch_size: 8
+train_epochs: 10
 
 shuffle: false
-eval_batch_size: 32
+eval_batch_size: 8
 eval_strategy: epoch
 
 project: sgpt
 run_name: mini-opt44M
 num_sanity_val_steps: 1
+
+limit_train_batches: 1
+limit_val_batches: 1

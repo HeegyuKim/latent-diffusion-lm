@@ -77,7 +77,7 @@ class OptimusTask(BaseTask):
         )
 
     @torch.no_grad()
-    def encode(self, reviews: Union[List[str], str], device: str = None):
+    def encode(self, reviews: Union[List[str], str], device: str = None, return_distribution: bool = False):
         if isinstance(reviews, str):
             reviews = [reviews]
 
@@ -87,7 +87,10 @@ class OptimusTask(BaseTask):
         src = self.tokenizer(reviews, return_tensors="pt", padding=True, truncation=True, max_length=self.config.model.max_seq_len)
         switch_dict_tensor_device(src, self.device)
 
-        return self.model(src).latent.loc
+        if return_distribution:
+            return self.model(src).latent
+        else:
+            return self.model(src).latent.loc
         
     @torch.no_grad()
     def generate(self, latents: torch.Tensor, prompts: Optional[Union[str, List[str]]] = None, device: str = None, **kwargs):

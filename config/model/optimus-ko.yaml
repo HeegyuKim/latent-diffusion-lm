@@ -1,5 +1,13 @@
 model: optimus
-encoder: klue/bert-base
+encoder: klue/roberta-base
 decoder: skt/kogpt2-base-v2
-latent_dim: 512
-max_seq_len: 512
+latent_dim: 768
+max_seq_len: 64
+free_bit: 2.0
+use_plm: true
+is_vae: true
+
+decoder_special_tokens:
+  bos_token: <s>
+  eos_token: </s>
+  pad_token: <pad>

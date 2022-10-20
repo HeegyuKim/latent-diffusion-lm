@@ -1,5 +1,4 @@
 from typing import Any, Callable, Mapping, Optional, Union
-from pydantic import BaseModel
 from omegaconf import DictConfig
 
 import torch
@@ -137,6 +136,7 @@ class BaseTask(pl.LightningModule):
             max_epochs=config.trainer.get("train_epochs", None),
             max_steps=config.trainer.get("train_steps", -1),
             limit_train_batches=config.trainer.get("limit_train_batches"),
+            limit_val_batches=config.trainer.get("limit_val_batches"),
             log_every_n_steps=config.trainer.get("log_every_n_steps", 1),
             val_check_interval=config.trainer.get("val_check_interval", None),
             num_sanity_val_steps=config.trainer.get("num_sanity_val_steps", 0),

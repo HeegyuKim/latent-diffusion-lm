@@ -110,15 +110,19 @@ class SGPTTask(BaseTask):
             self.config.dataset.test,
             self.config.model.max_seq_len,
             column="utterances",
-            split="test"
+            split="train"
         )
 
     def _item_for_train(self, sents):
-        sents = self.autoencoder.encode(sents, return_distribution=True)
-        mask_len = min(sents.loc.shape[0] - 1, self.config.model.max_seq_len)
+        mask_len = min(len(sents) - 1, self.config.model.max_seq_len)
+        out_sents = sents[1:] # + [""] * (self.config.model.max_seq_len - mask_len)
+        if len(out_sents) > self.config.model.max_seq_len:
+            out_sents = out_sents[:self.config.model.max_seq_len]
         attention_mask = [1] * mask_len + [0] * (self.config.model.max_seq_len - mask_len)
 
+        sents = self.autoencoder.encode(sents, return_distribution=True)
         sents = pad_sentence_latents(sents, self.config.model.max_seq_len + 1)
+
         inputs = Normal(
             sents.loc[:-1],
             sents.scale[:-1]
@@ -131,12 +135,53 @@ class SGPTTask(BaseTask):
             "inputs": inputs,
             "attention_mask": torch.LongTensor(attention_mask).to(self.device),
             "labels": labels
-        }
+        }, out_sents
+
+    def _compute_kldiv_loss(self, output, batch): 
+        loss = self.model.kldiv_loss(
+            output.latent,
+            batch["labels"],
+            attention_mask=batch["attention_mask"],
+            use_free_bit=False
+        )
+        return loss
+
+    def _compute_nll_loss(self, output, sents, masks, sample=False):
+        if sample:
+            latent = output.latent.rsample()
+        else:
+            latent = output.latent.loc
+
+        latent = latent.view(-1, output.latent.loc.shape[2]) # [batch * seq_len, latent_dim]
+        latent = latent[masks == 1]
+        inputs = self.autoencoder.tokenizer(
+            sents, 
+            padding=True, 
+            truncation=True, 
+            max_length=self.autoencoder.config.model.max_seq_len,
+            return_tensors="pt"
+            )
+        switch_dict_tensor_device(inputs, self.device)
+
+        if "token_type_ids" in inputs:
+            del inputs["token_type_ids"]
+        inputs["labels"] = inputs["input_ids"]
+
+        return self.autoencoder.model.decoder(
+            **inputs,
+            past_key_values=(latent,),
+            latent_as_gpt_memory=True,
+            latent_as_gpt_emb=True,
+            return_dict=True
+        ).loss
 
     def step(self, batch, batch_idx, sample=False) -> dict:
         new_batch = defaultdict(list)
+        sents = []
+        
         for b in batch:
-            item = self._item_for_train(b["utterances"])
+            item, s = self._item_for_train(b["utterances"])
+            sents.extend(s)
             for k, v in item.items():
                 new_batch[k].append(v)
         
@@ -151,17 +196,17 @@ class SGPTTask(BaseTask):
         else:
             inputs = batch["inputs"].loc
 
+        all_masks = torch.cat(new_batch["attention_mask"])
+
         output = self.model(
             inputs_embeds=inputs,
             attention_mask=batch["attention_mask"],
             compute_kldiv_loss=True
             )
-        loss = self.model.kldiv_loss(
-            output.latent,
-            batch["labels"],
-            attention_mask=batch["attention_mask"],
-            use_free_bit=False
-        )
+
+        kldiv_loss = self._compute_kldiv_loss(output, batch)
+        nll_loss = self._compute_nll_loss(output, sents, all_masks, sample)
+        loss = nll_loss / 100 + kldiv_loss
         return loss, output
 
     def training_step(self, batch, batch_idx) -> dict:

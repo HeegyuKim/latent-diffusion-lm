@@ -10,6 +10,8 @@ from torch.utils.data import random_split
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 
+from ..model_utils import apply_weight_clipping
+
 
 def get_logger(config):
     name = config.logger.name
@@ -116,6 +118,7 @@ class BaseTask(pl.LightningModule):
         else:
             return None
 
+
     @classmethod
     def main(cls, config: DictConfig):
         ckpt = config.get("checkpoint", None)
@@ -141,6 +144,7 @@ class BaseTask(pl.LightningModule):
             val_check_interval=config.trainer.get("val_check_interval", None),
             num_sanity_val_steps=config.trainer.get("num_sanity_val_steps", 0),
             strategy=config.trainer.get("strategy", None),
+            gradient_clip_val=config.trainer.get("gradient_clip_val", 0),
             callbacks=[checkpoint],
         )
         trainer.fit(task, ckpt_path=config.trainer.get("resume_from_checkpoint"))

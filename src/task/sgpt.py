@@ -1,4 +1,6 @@
 from typing import Any, Callable, List, Optional, Union
+
+from ..model_utils import apply_weight_clipping
 from .base import BaseTask
 from omegaconf import DictConfig
 from coop.models import Optimus
@@ -70,6 +72,10 @@ def pad_sentence_latents(sents: Normal, max_seq_len: int, epsilon=1e-6):
             torch.cat([sents.scale, pad.scale], dim=0)
         )
 
+class NoCollator():
+    def __call__(self, x: Any) -> Any:
+        return x
+        
 
 class SGPTTask(BaseTask):
 
@@ -78,22 +84,22 @@ class SGPTTask(BaseTask):
         gpt2_config = GPT2Config.from_json_file(to_absolute_path("config/model/" + config.model.model))
         self.autoencoder = OptimusTask.load_from_checkpoint(to_absolute_path(config.model.autoencoder)).eval()
         freeze_model(self.autoencoder)
-        self.model = SentenceGPT(
-            gpt2_config,
-            config.model.latent_dim,
-            config.model.free_bit
-            )
-        # self.model = VAEMLP(
+        # self.model = SentenceGPT(
+        #     gpt2_config,
         #     config.model.latent_dim,
         #     config.model.free_bit
-        # )
+        #     )
+        self.model = VAEMLP(
+            config.model.latent_dim,
+            config.model.free_bit
+        )
 
     
     def get_train_collator(self) -> Callable:
-        return lambda x: x
+        return NoCollator()
 
     def get_eval_collator(self) -> Callable:
-        return lambda x: x
+        return NoCollator()
 
     def get_train_dataset(self) -> Dataset:
         return SGPTDataset(
@@ -113,6 +119,13 @@ class SGPTTask(BaseTask):
             split="train"
         )
 
+    def optimizer_step(self, current_epoch, batch_idx, optimizer, optimizer_idx, *args, **kwargs):
+        super().optimizer_step(current_epoch, batch_idx, optimizer, optimizer_idx, *args, **kwargs)
+        
+        if "weight_clipping" in self.config.trainer:
+            wc_val = self.config.trainer.weight_clipping
+            apply_weight_clipping(self.model, -wc_val, wc_val)
+
     def _item_for_train(self, sents):
         mask_len = min(len(sents) - 1, self.config.model.max_seq_len)
         out_sents = sents[1:] # + [""] * (self.config.model.max_seq_len - mask_len)
@@ -131,6 +144,10 @@ class SGPTTask(BaseTask):
             sents.loc[1:],
             sents.scale[1:]
         )
+        # labels = Normal(
+        #     sents.loc[:-1],
+        #     sents.scale[:-1]
+        # )
         return {
             "inputs": inputs,
             "attention_mask": torch.LongTensor(attention_mask).to(self.device),
@@ -145,6 +162,19 @@ class SGPTTask(BaseTask):
             use_free_bit=False
         )
         return loss
+
+    def _compute_mse_loss(self, output, batch):
+        x, y = output.latent, batch["labels"]
+        mean_mse = F.mse_loss(x.loc, y.loc)
+        std_mse = F.mse_loss(x.scale, y.scale)
+        return mean_mse #$ + std_mse
+
+    def _compute_wasserstein_loss(self, output, batch):
+        x, y = output.latent, batch["labels"]
+        mean_wl = -1 * (x.loc * y.loc).mean()
+        std_wl = -1 * (x.scale * y.scale).mean()
+        return mean_wl + std_wl
+
 
     def _compute_nll_loss(self, output, sents, masks, sample=False):
         if sample:
@@ -204,13 +234,14 @@ class SGPTTask(BaseTask):
             compute_kldiv_loss=True
             )
 
-        kldiv_loss = self._compute_kldiv_loss(output, batch)
-        nll_loss = self._compute_nll_loss(output, sents, all_masks, sample)
-        loss = nll_loss / 100 + kldiv_loss
+        loss = self._compute_kldiv_loss(output, batch)
+        # nll_loss = self._compute_nll_loss(output, sents, all_masks, sample)
+        # loss = nll_loss / 100 + kldiv_loss
+        # loss = self._compute_mse_loss(output, batch)
         return loss, output
 
     def training_step(self, batch, batch_idx) -> dict:
-        loss, output = self.step(batch, batch_idx, True)
+        loss, output = self.step(batch, batch_idx, False)
 
         out = {"loss": loss, "zkl": output.zkl, "zkl_real": output.zkl_real}
         self.log_dict(out, prefix="train_", prog_bar=True)

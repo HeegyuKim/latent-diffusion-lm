@@ -2,9 +2,9 @@ defaults:
 - optimizer: adam-sgpt
 - logger: wandb
 - dataset: sgpt-conv
-- model: sgpt-base
-- trainer: sgpt-mini
+- model: sgpt-tiny
+- trainer: sgpt-tiny
 - _self_
 
 trainer:
-  run_name: base-opt56M
+  run_name: tiny-opt44M

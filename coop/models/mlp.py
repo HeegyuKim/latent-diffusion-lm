@@ -12,17 +12,37 @@ class VAEMLP(torch.nn.Module):
                  ) -> None:
         super().__init__()
 
+        hidden_dim = 4 * latent_dim
         self.model = torch.nn.Sequential(
-            torch.nn.Linear(latent_dim, latent_dim),
-            torch.nn.Linear(latent_dim, latent_dim),
-            torch.nn.Linear(latent_dim, latent_dim),
-            torch.nn.Linear(latent_dim, latent_dim),
-            torch.nn.Linear(latent_dim, latent_dim),
-            torch.nn.Linear(latent_dim, latent_dim),
-            torch.nn.Linear(latent_dim, latent_dim)
+            torch.nn.Linear(latent_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.GELU(),
         )
         self.proj = nn.Linear(
-            latent_dim, 
+            hidden_dim, 
             2 * latent_dim, 
             bias=False
         )

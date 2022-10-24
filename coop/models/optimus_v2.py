@@ -65,8 +65,8 @@ class Optimus(Model):
         zkl_real = kl_divergence(q, p)
         kl_mask = torch.gt(zkl_real, self.free_bit)
         bz = cls_vec.size(0)
-        zkl = zkl_real[kl_mask].mean()
-        zkl_real = zkl_real.mean()
+        zkl = zkl_real[kl_mask].sum() / bz
+        zkl_real = zkl_real.sum(dim=-1).mean()
 
         if tgt is not None:
             latent = q.rsample()

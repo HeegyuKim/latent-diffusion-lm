@@ -1,4 +1,5 @@
 train_batch_size: 32
+accumulate_grad_batches: 1
 train_steps: 1000000
 # accelerator: cpu # cpu for test, gpu default
 
@@ -9,5 +10,5 @@ eval_strategy: steps
 optimus_checkout_step: 25000
 val_check_interval: 50000
 project: optimus
-run_name: v2-tiny-vae
+run_name: v2-tiny-vae-bow
 num_sanity_val_steps: 1

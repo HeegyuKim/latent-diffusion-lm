@@ -6,4 +6,4 @@ latent_dim: 512
 max_seq_len: 64
 free_bit: 2.0
 use_plm: false
-is_vae: false
+is_vae: true

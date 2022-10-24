@@ -12,5 +12,5 @@ project: sgpt
 run_name: tiny-opt44M
 num_sanity_val_steps: 0
 
-limit_train_batches: 1
+limit_train_batches: 50
 limit_val_batches: 1

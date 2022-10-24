@@ -1,0 +1,8 @@
+defaults:
+- optimizer: adam
+- logger: wandb
+- dataset: aihub_conv
+- model: optimus-v2-tiny
+- trainer: optimus-v2-tiny-poc
+- _self_
+

@@ -1,0 +1,14 @@
+train_batch_size: 32
+train_epoch: 10
+# accelerator: cpu # cpu for test, gpu default
+
+shuffle: false
+eval_batch_size: 8
+eval_strategy: epoch
+
+optimus_checkout_step: 20000
+project: optimus
+run_name: v2-tiny-vae-bow-poc
+num_sanity_val_steps: 1
+
+limit_val_batches: 16

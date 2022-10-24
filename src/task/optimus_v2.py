@@ -2,7 +2,9 @@ from typing import Any, Callable, List, Optional, Union
 from .base import BaseTask
 from omegaconf import DictConfig
 from coop.models.optimus_v2 import Optimus
+from coop.models.mlp import BowPredictor
 from coop.metric import levenshtein_batch
+from coop.bow import create_bow
 from transformers import RobertaConfig, GPT2Config
 import pandas as pd
 import torch
@@ -36,6 +38,8 @@ class OptimusTask(BaseTask):
         
         self.encoder_config = RobertaConfig.from_json_file(to_absolute_path("config/model/" + config.model.encoder))
         self.decoder_config = GPT2Config.from_json_file(to_absolute_path("config/model/" + config.model.decoder))
+        if self.config.model.get("bow_loss", True):
+            self.bow_model = BowPredictor(config.model.latent_dim, self.encoder_config.vocab_size)   
         self.model = Optimus(
             config.model.latent_dim,
             self.tokenizer.pad_token_id,
@@ -108,6 +112,7 @@ class OptimusTask(BaseTask):
 
 
     def step(self, batch, batch_idx) -> dict:
+        out = {}
         src = {
             "input_ids": batch["input_ids"],
             "attention_mask": batch["attention_mask"],
@@ -118,31 +123,41 @@ class OptimusTask(BaseTask):
             "attention_mask": batch["attention_mask"],
             "labels": batch["labels"],
         }
-        return self.model(src=src, tgt=tgt)
-
-    def training_step(self, batch, batch_idx) -> dict:
-        loss = self.step(batch, batch_idx)
-
-        nll, zkl, zkl_real = loss.nll, loss.zkl, loss.zkl_real
-        klw = self.model.klw(
-            self.global_step, self.config.trainer.optimus_checkout_step
-        )
-        loss = nll + klw * zkl
-
-        out = {"loss": loss, "nll": nll, "zkl": zkl, "zkl_real": zkl_real, "klw": klw}
-        self.log_dict(out, prefix="train_", prog_bar=True)
+        model_out = self.model(src=src, tgt=tgt)
+        loss = model_out.nll
 
         if self.config.model.get("is_vae", True):
-            return out
-        else:
-            return out["nll"]
+            zkl, zkl_real = model_out.zkl, model_out.zkl_real 
+            klw = self.model.klw(
+                self.global_step, self.config.trainer.optimus_checkout_step
+            )
+            out["nll"] = loss.clone()
+            out["zkl"] = zkl
+            out["zkl_real"] = zkl_real
+            out["klw"] = klw
+            loss += klw * zkl
+
+        if self.config.model.get("bow_loss", True):
+            bow = create_bow(
+                batch["input_ids"].cpu(),
+                self.encoder_config.vocab_size,
+                [self.tokenizer.pad_token_id]
+                ).to(self.device)
+            bow_pred = self.bow_model(model_out.latent.rsample())
+            bow_kl = F.binary_cross_entropy(bow_pred, bow)
+            out["bow_loss"] = bow_kl
+            loss += bow_kl
+        out["loss"] = loss
+        return out
+
+    def training_step(self, batch, batch_idx) -> dict:
+        out = self.step(batch, batch_idx)
+        self.log_dict(out, prefix="train_", prog_bar=True)
+        return out
 
     def validation_step(self, batch, batch_idx) -> dict:
-        loss = self.step(batch, batch_idx)
-        nll, zkl, zkl_real = loss.nll, loss.zkl, loss.zkl_real
-
-        out = {"loss": nll + zkl, "nll": nll, "zkl": zkl, "zkl_real": zkl_real}
-        self.log_dict(out, prefix="eval_", on_epoch=True)
+        out = self.step(batch, batch_idx)
+        self.log_dict(out, prefix="eval_", prog_bar=True)
         
         input_sents = self.tokenizer.batch_decode(batch["input_ids"], skip_special_tokens=True)
         input_latents = self.encode(input_sents)

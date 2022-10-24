@@ -65,8 +65,8 @@ class Optimus(Model):
         zkl_real = kl_divergence(q, p)
         kl_mask = torch.gt(zkl_real, self.free_bit)
         bz = cls_vec.size(0)
-        zkl = zkl_real[kl_mask].sum() / bz
-        zkl_real = zkl_real.sum(dim=-1).mean()
+        zkl = zkl_real[kl_mask].mean()
+        zkl_real = zkl_real.mean()
 
         if tgt is not None:
             latent = q.rsample()
@@ -721,12 +721,9 @@ class OptimusDecoder(GPT2LMHeadModel):
             shift_logits = lm_logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
-            loss_fct = CrossEntropyLoss(reduction="sum", ignore_index=self.label_for_pad_id)
-            loss = (
-                loss_fct(
-                    shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
-                )
-                / labels.shape[0]
+            loss_fct = CrossEntropyLoss(reduction="mean", ignore_index=self.label_for_pad_id)
+            loss = loss_fct(
+                shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
             )
             # bz = labels.size(0)
             # loss = losses[shift_labels.view(-1) != self.pad_id].sum() / bz

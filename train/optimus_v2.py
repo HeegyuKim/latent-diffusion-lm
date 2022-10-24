@@ -7,6 +7,7 @@ from omegaconf import DictConfig
 import os
 
 os.environ["HYDRA_FULL_ERROR"] = "1"
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 
 @hydra.main("../config", "optimus_v2.yaml")

@@ -4,6 +4,25 @@ from torch.distributions import Normal, kl_divergence
 from typing import Any, Callable, List, Optional, Union
 from .sgpt import SentenceGPTOutput
 
+
+class BowPredictor(torch.nn.Module):
+
+    def __init__(self,
+                 latent_dim: int,
+                 vocab_size: int
+                 ) -> None:
+        super().__init__()
+
+        self.model = torch.nn.Sequential(
+            torch.nn.Linear(latent_dim, vocab_size),
+            torch.nn.Sigmoid(),
+        )
+
+    def forward(self, X):
+        return self.model(X)
+
+
+
 class VAEMLP(torch.nn.Module):
 
     def __init__(self,

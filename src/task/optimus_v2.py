@@ -139,7 +139,7 @@ class OptimusTask(BaseTask):
 
         if self.config.model.get("bow_loss", True):
             bow = create_bow(
-                batch["input_ids"].cpu(),
+                batch["input_ids"].cpu().tolist(),
                 self.encoder_config.vocab_size,
                 [self.tokenizer.pad_token_id]
                 ).to(self.device)

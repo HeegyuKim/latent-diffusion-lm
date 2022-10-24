@@ -24,3 +24,13 @@ def apply_weight_clipping(model, min_value, max_value):
     for param in model.parameters():
         if param.requires_grad:
             param.clamp_(min_value, max_value)
+
+            
+def switch_dict_tensor_device(d: dict, device: str):
+    for k, v in d.items():
+        if torch.is_tensor(v) and v.device != device:
+            d[k] = v.to(device)
+
+def freeze_model(model):
+    for p in model.parameters():
+        p.requires_grad = False

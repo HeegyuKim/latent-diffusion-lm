@@ -1,0 +1,15 @@
+train_batch_size: 8
+train_epochs: 20
+
+shuffle: true
+eval_batch_size: 8
+eval_strategy: epoch
+
+gradient_clip_val: 1.0
+
+project: latent-dialog
+run_name: roberta-small-opt44M
+num_sanity_val_steps: 0
+
+# limit_train_batches: 110
+# limit_val_batches: 1

@@ -97,7 +97,7 @@ class OptimusTask(BaseTask):
             
         generations = self.model.generate(z=latents, input_ids=input_ids, **kwargs)
         generations = [[x for x in g if x >= 0] for g in generations]
-        return self.dec_tok.batch_decode(generations, skip_special_tokens=False)
+        return self.dec_tok.batch_decode(generations, skip_special_tokens=True)
 
 
     def step(self, batch, batch_idx) -> dict:

@@ -1,0 +1,10 @@
+defaults:
+- optimizer: adam
+- logger: wandb
+- dataset: latent-dialog
+- model: latent-dialog-roberta-small
+- trainer: latent-dialog
+- _self_
+
+# trainer:
+#   run_name: tiny-opt44M

@@ -1,0 +1,9 @@
+model: sgpt-tiny.json
+latent_dim: 512
+free_bit: 0.5
+max_sentence_len: 17
+
+tokenizer: klue/roberta-base
+encoder: roberta-tiny.json
+decoder: gpt2-tiny.json
+max_seq_len: 64

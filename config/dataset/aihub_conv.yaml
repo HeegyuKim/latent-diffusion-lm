@@ -3,3 +3,5 @@ train:
   
 test:
   - heegyu/aihub_daily_conv_2022_sentences
+
+streaming: false

@@ -38,7 +38,7 @@ class ListCollator():
         return out
         
 
-class LatentDialogTask(BaseTask):
+class LatentDialogTaskV2(BaseTask):
 
     def __init__(self, config: DictConfig) -> None:
         super().__init__(config)

@@ -72,6 +72,7 @@ class OptimusPLMDataset(IterableDataset):
     column: str = "sentence"
     weights: Optional[List] = None
     split: str = "train"
+    streaming: bool = True
 
     def __iter__(self) -> dict:
         ds = []
@@ -79,7 +80,7 @@ class OptimusPLMDataset(IterableDataset):
             return len(x) >= 10 and len(x) <= 256 and "뉴시스" not in x and "재배포" not in x
 
         for name in self.dataset_paths:
-            d = load_dataset(name, split=self.split, streaming=True, use_auth_token=True)
+            d = load_dataset(name, split=self.split, streaming=self.streaming, use_auth_token=True)
             d = d.filter(lambda x: filter_text(x["sentence"]))
             ds.append(d)
 

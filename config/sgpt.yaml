@@ -6,5 +6,7 @@ defaults:
 - trainer: sgpt-tiny
 - _self_
 
+model:
+  max_seq_len: 32
 trainer:
-  run_name: tiny-opt44M
+  run_name: tiny-bow-poc

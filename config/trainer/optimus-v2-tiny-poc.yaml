@@ -1,5 +1,5 @@
-train_batch_size: 32
-train_epoch: 10
+train_batch_size: 256
+train_epochs: 10
 # accelerator: cpu # cpu for test, gpu default
 
 shuffle: false

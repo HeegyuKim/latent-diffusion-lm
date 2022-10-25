@@ -10,14 +10,14 @@ def create_bow(arr: List[List[int]], vocab_size: int, skip_tokens: List[int] = [
                 x[i, t] = 1 # += 1 대신 +1
     return x
 
+def indices_of(arr, v):
+    return [i for i, x in enumerate(arr) if x == v]
 
-# def create_bow(arr: List[List[int]], vocab_size: int, skip_tokens: List[int] = []):
-#     x = torch.zeros((len(arr), vocab_size))
-#     for i, v in enumerate(arr):
-#         for t in v:
-#             if t not in skip_tokens:
-#                 x[i, t] += 1
-#     return x
+t = torch.tensor([[0, 1, 2, 2,3,3],[1,2,3,4,5,6]])
+
+def bow_to_ids(x: torch.Tensor, threshold: float = 0.5):
+    x = (x >= threshold).int().tolist()
+    return [indices_of(x, 1) for x in t]
 
 
 def discrete_kl_div(inputs, targets):

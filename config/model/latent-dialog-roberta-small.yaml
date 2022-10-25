@@ -1,5 +1,6 @@
-model: klue/roberta-small
-autoencoder: checkpoint/optimus-v2-44M/optimus-v2-tiny-vae.ckpt
+model: klue/roberta-large
+autoencoder: checkpoint/optimus-v2-tiny-ae-bow-poc-v1.ckpt
+# autoencoder: checkpoint/optimus-v2-44M/optimus-v2-tiny-vae.ckpt
 latent_dim: 512
 max_seq_len: 512
 free_bit: 2.0

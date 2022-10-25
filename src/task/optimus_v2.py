@@ -69,7 +69,8 @@ class OptimusTask(BaseTask):
             self.config.dataset.train,
             self.tokenizer,
             self.config.model.max_seq_len,
-            weights=self.config.dataset.get("train_weights")
+            weights=self.config.dataset.get("train_weights"),
+            streaming=self.config.dataset.get("streaming", True)
         )
 
     def get_eval_dataset(self) -> Dataset:
@@ -77,7 +78,8 @@ class OptimusTask(BaseTask):
             self.config.dataset.test,
             self.tokenizer,
             self.config.model.max_seq_len,
-            split="test"
+            split="test",
+            streaming=self.config.dataset.get("streaming", True)
         )
 
     @torch.no_grad()

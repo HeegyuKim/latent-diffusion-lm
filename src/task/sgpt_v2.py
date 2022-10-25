@@ -3,7 +3,7 @@ from typing import Any, Callable, List, Optional, Union
 from ..model_utils import apply_weight_clipping
 from .base import BaseTask
 from omegaconf import DictConfig
-from coop.models import Optimus
+from coop.models.optimus_v2 import Optimus
 import pandas as pd
 import torch
 import torch.optim as optim
@@ -12,7 +12,7 @@ from torch import kl_div, nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, Dataset
 
-from transformers import GPT2Model, GPT2Config
+from transformers import GPT2Model, GPT2Config, RobertaConfig, AutoTokenizer
 from coop.models.sgpt import SentenceGPT
 from coop.models.mlp import VAEMLP
 from tokenizers import Tokenizer
@@ -77,22 +77,34 @@ class NoCollator():
         return x
         
 
-class SGPTTask(BaseTask):
+class SGPTTaskV2(BaseTask):
 
     def __init__(self, config: DictConfig) -> None:
         super().__init__(config)
         gpt2_config = GPT2Config.from_json_file(to_absolute_path("config/model/" + config.model.model))
-        self.autoencoder = OptimusTask.load_from_checkpoint(to_absolute_path(config.model.autoencoder)).eval()
-        freeze_model(self.autoencoder)
-        # self.model = SentenceGPT(
-        #     gpt2_config,
-        #     config.model.latent_dim,
-        #     config.model.free_bit
-        #     )
-        self.model = VAEMLP(
+        self.tokenizer = AutoTokenizer.from_pretrained(config.model.tokenizer)
+        self.encoder_config = RobertaConfig.from_json_file(to_absolute_path("config/model/" + config.model.encoder))
+        self.decoder_config = GPT2Config.from_json_file(to_absolute_path("config/model/" + config.model.decoder))
+        self.autoencoder = Optimus(
             config.model.latent_dim,
+            self.tokenizer.pad_token_id,
+            self.tokenizer.bos_token_id,
+            self.tokenizer.eos_token_id,
+            self.encoder_config,
+            self.decoder_config,
             config.model.free_bit
         )
+
+        # freeze_model(self.autoencoder)
+        self.sgpt = SentenceGPT(
+            gpt2_config,
+            config.model.latent_dim,
+            config.model.free_bit
+            )
+        # self.model = VAEMLP(
+        #     config.model.latent_dim,
+        #     config.model.free_bit
+        # )
 
     
     def get_train_collator(self) -> Callable:
@@ -119,22 +131,12 @@ class SGPTTask(BaseTask):
             split="train"
         )
 
-    def optimizer_step(self, current_epoch, batch_idx, optimizer, optimizer_idx, *args, **kwargs):
-        super().optimizer_step(current_epoch, batch_idx, optimizer, optimizer_idx, *args, **kwargs)
-        
-        if "weight_clipping" in self.config.trainer:
-            wc_val = self.config.trainer.weight_clipping
-            apply_weight_clipping(self.model, -wc_val, wc_val)
-
     def _item_for_train(self, sents):
-        mask_len = min(len(sents) - 1, self.config.model.max_seq_len)
-        out_sents = sents[1:] # + [""] * (self.config.model.max_seq_len - mask_len)
-        if len(out_sents) > self.config.model.max_seq_len:
-            out_sents = out_sents[:self.config.model.max_seq_len]
-        attention_mask = [1] * mask_len + [0] * (self.config.model.max_seq_len - mask_len)
+        if len(sents) > self.config.model.max_sentence_len:
+            sents = sents[:self.config.model.max_sentence_len]
 
-        sents = self.autoencoder.encode(sents, return_distribution=True)
-        sents = pad_sentence_latents(sents, self.config.model.max_seq_len + 1)
+        inputs = self.tokenizer(sents, padding="max_length", truncation=True, max_length=self.config.model.max_seq_len)
+        sents = self.model.encoder(**inputs).pooler_output
 
         inputs = Normal(
             sents.loc[:-1],
@@ -153,27 +155,6 @@ class SGPTTask(BaseTask):
             "attention_mask": torch.LongTensor(attention_mask).to(self.device),
             "labels": labels
         }, out_sents
-
-    def _compute_kldiv_loss(self, output, batch): 
-        loss = self.model.kldiv_loss(
-            output.latent,
-            batch["labels"],
-            attention_mask=batch["attention_mask"],
-            use_free_bit=False
-        )
-        return loss
-
-    def _compute_mse_loss(self, output, batch):
-        x, y = output.latent, batch["labels"]
-        mean_mse = F.mse_loss(x.loc, y.loc)
-        std_mse = F.mse_loss(x.scale, y.scale)
-        return mean_mse #$ + std_mse
-
-    def _compute_wasserstein_loss(self, output, batch):
-        x, y = output.latent, batch["labels"]
-        mean_wl = -1 * (x.loc * y.loc).mean()
-        std_wl = -1 * (x.scale * y.scale).mean()
-        return mean_wl + std_wl
 
 
     def _compute_nll_loss(self, output, sents, masks, sample=False):
@@ -234,7 +215,7 @@ class SGPTTask(BaseTask):
             compute_kldiv_loss=True
             )
 
-        loss = self._compute_mse_loss(output, batch)
+        loss = self._compute_kldiv_loss(output, batch)
         # nll_loss = self._compute_nll_loss(output, sents, all_masks, sample)
         # loss = nll_loss / 100 + kldiv_loss
         # loss = self._compute_mse_loss(output, batch)

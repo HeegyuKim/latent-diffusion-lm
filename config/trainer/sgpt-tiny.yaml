@@ -1,4 +1,4 @@
-train_batch_size: 1
+train_batch_size: 64
 train_epochs: 20
 
 shuffle: false
@@ -12,5 +12,5 @@ project: sgpt
 run_name: tiny-opt44M
 num_sanity_val_steps: 0
 
-limit_train_batches: 1
-limit_val_batches: 1
+limit_train_batches: 100
+limit_val_batches: 2

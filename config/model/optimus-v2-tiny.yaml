@@ -7,3 +7,4 @@ max_seq_len: 64
 free_bit: 2.0
 use_plm: false
 is_vae: true
+bow_loss: true

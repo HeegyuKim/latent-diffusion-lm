@@ -8,3 +8,6 @@ defaults:
 
 trainer:
   run_name: tiny-opt44M
+
+optimizer:
+  learning_rate: 1e-4

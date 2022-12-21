@@ -134,6 +134,7 @@ class SGPTTask(BaseTask):
         attention_mask = [1] * mask_len + [0] * (self.config.model.max_seq_len - mask_len)
 
         sents = self.autoencoder.encode(sents, return_distribution=True)
+        print((sents.loc[:-1] - sents.loc[1:]).mean())
         sents = pad_sentence_latents(sents, self.config.model.max_seq_len + 1)
 
         inputs = Normal(
@@ -205,7 +206,7 @@ class SGPTTask(BaseTask):
             return_dict=True
         ).loss
 
-    def step(self, batch, batch_idx, sample=False) -> dict:
+    def _step(self, batch, batch_idx, sample=False) -> dict:
         new_batch = defaultdict(list)
         sents = []
         
@@ -221,10 +222,11 @@ class SGPTTask(BaseTask):
             "attention_mask": torch.stack(new_batch["attention_mask"])
         }
 
-        if sample:
-            inputs = batch["inputs"].rsample()
-        else:
-            inputs = batch["inputs"].loc
+        # if sample:
+        #     inputs = batch["inputs"].rsample()
+        # else:
+        #     inputs = batch["inputs"].loc
+        inputs = batch["inputs"].loc
 
         all_masks = torch.cat(new_batch["attention_mask"])
 
@@ -234,14 +236,14 @@ class SGPTTask(BaseTask):
             compute_kldiv_loss=True
             )
 
-        loss = self._compute_kldiv_loss(output, batch)
+        # loss = self._compute_kldiv_loss(output, batch)
         # nll_loss = self._compute_nll_loss(output, sents, all_masks, sample)
         # loss = nll_loss / 100 + kldiv_loss
-        # loss = self._compute_mse_loss(output, batch)
+        loss = self._compute_mse_loss(output, batch)
         return loss, output
 
     def training_step(self, batch, batch_idx) -> dict:
-        loss, output = self.step(batch, batch_idx, False)
+        loss, output = self._step(batch, batch_idx, False)
 
         out = {"loss": loss, "zkl": output.zkl, "zkl_real": output.zkl_real}
         self.log_dict(out, prefix="train_", prog_bar=True)
@@ -249,7 +251,7 @@ class SGPTTask(BaseTask):
         return out
 
     def validation_step(self, batch, batch_idx) -> dict:
-        loss, output = self.step(batch, batch_idx)
+        loss, output = self._step(batch, batch_idx)
 
         out = {"loss": loss, "zkl": output.zkl, "zkl_real": output.zkl_real}
         self.log_dict(out, prefix="val_", on_epoch=True, batch_size=len(batch))

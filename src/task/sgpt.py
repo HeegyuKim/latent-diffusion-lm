@@ -134,8 +134,8 @@ class SGPTTask(BaseTask):
         attention_mask = [1] * mask_len + [0] * (self.config.model.max_seq_len - mask_len)
 
         sents = self.autoencoder.encode(sents, return_distribution=True)
-        print((sents.loc[:-1] - sents.loc[1:]).mean())
-        sents = pad_sentence_latents(sents, self.config.model.max_seq_len + 1)
+        print((sents.loc[:-1] - sents.loc[1:]).abs().mean())
+        # sents = pad_sentence_latents(sents, self.config.model.max_seq_len + 1)
 
         inputs = Normal(
             sents.loc[:-1],
@@ -151,7 +151,7 @@ class SGPTTask(BaseTask):
         # )
         return {
             "inputs": inputs,
-            "attention_mask": torch.LongTensor(attention_mask).to(self.device),
+            # "attention_mask": torch.LongTensor(attention_mask).to(self.device),
             "labels": labels
         }, out_sents
 
@@ -165,10 +165,11 @@ class SGPTTask(BaseTask):
         return loss
 
     def _compute_mse_loss(self, output, batch):
-        x, y = output.latent, batch["labels"]
-        mean_mse = F.mse_loss(x.loc, y.loc)
-        std_mse = F.mse_loss(x.scale, y.scale)
-        return mean_mse #$ + std_mse
+        x, y = output.latent, batch["labels"].loc
+        # mean_mse = F.mse_loss(x.loc, y.loc)
+        # std_mse = F.mse_loss(x.scale, y.scale)
+        # return mean_mse #$ + std_mse
+        return F.mse_loss(x, y)
 
     def _compute_wasserstein_loss(self, output, batch):
         x, y = output.latent, batch["labels"]
@@ -219,7 +220,7 @@ class SGPTTask(BaseTask):
         batch = {
             "inputs": stack_normals(new_batch["inputs"]),
             "labels": stack_normals(new_batch["labels"]),
-            "attention_mask": torch.stack(new_batch["attention_mask"])
+            # "attention_mask": torch.stack(new_batch["attention_mask"])
         }
 
         # if sample:
@@ -228,12 +229,12 @@ class SGPTTask(BaseTask):
         #     inputs = batch["inputs"].loc
         inputs = batch["inputs"].loc
 
-        all_masks = torch.cat(new_batch["attention_mask"])
+        # all_masks = torch.cat(new_batch["attention_mask"])
 
         output = self.model(
             inputs_embeds=inputs,
-            attention_mask=batch["attention_mask"],
-            compute_kldiv_loss=True
+            attention_mask=None,#batch["attention_mask"],
+            compute_kldiv_loss=False
             )
 
         # loss = self._compute_kldiv_loss(output, batch)
@@ -246,7 +247,7 @@ class SGPTTask(BaseTask):
         loss, output = self._step(batch, batch_idx, False)
 
         out = {"loss": loss, "zkl": output.zkl, "zkl_real": output.zkl_real}
-        self.log_dict(out, prefix="train_", prog_bar=True)
+        # self.log_dict(out, prefix="train_", prog_bar=True)
         
         return out
 
@@ -254,7 +255,7 @@ class SGPTTask(BaseTask):
         loss, output = self._step(batch, batch_idx)
 
         out = {"loss": loss, "zkl": output.zkl, "zkl_real": output.zkl_real}
-        self.log_dict(out, prefix="val_", on_epoch=True, batch_size=len(batch))
+        # self.log_dict(out, prefix="val_", on_epoch=True, batch_size=len(batch))
 
         if batch_idx == 0:
             table = wandb.Table(["dialog", "index", "input", "output"])

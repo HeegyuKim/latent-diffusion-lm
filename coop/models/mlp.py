@@ -41,24 +41,24 @@ class VAEMLP(torch.nn.Module):
             torch.nn.GELU(),
             torch.nn.Linear(hidden_dim, hidden_dim),
             torch.nn.GELU(),
-            torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.GELU(),
-            torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.GELU(),
-            torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.GELU(),
-            torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.GELU(),
-            torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.GELU(),
-            torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.GELU(),
-            torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.GELU(),
-            torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.GELU(),
-            torch.nn.Linear(hidden_dim, hidden_dim),
-            torch.nn.GELU(),
+            torch.nn.Linear(hidden_dim, latent_dim),
+            # torch.nn.GELU(),
+            # torch.nn.Linear(hidden_dim, hidden_dim),
+            # torch.nn.GELU(),
+            # torch.nn.Linear(hidden_dim, hidden_dim),
+            # torch.nn.GELU(),
+            # torch.nn.Linear(hidden_dim, hidden_dim),
+            # torch.nn.GELU(),
+            # torch.nn.Linear(hidden_dim, hidden_dim),
+            # torch.nn.GELU(),
+            # torch.nn.Linear(hidden_dim, hidden_dim),
+            # torch.nn.GELU(),
+            # torch.nn.Linear(hidden_dim, hidden_dim),
+            # torch.nn.GELU(),
+            # torch.nn.Linear(hidden_dim, hidden_dim),
+            # torch.nn.GELU(),
+            # torch.nn.Linear(hidden_dim, hidden_dim),
+            # torch.nn.GELU(),
         )
         self.proj = nn.Linear(
             hidden_dim, 
@@ -95,16 +95,16 @@ class VAEMLP(torch.nn.Module):
     def forward(
         self,
         inputs_embeds: torch.Tensor,
-        attention_mask: Optional[torch.Tensor],
+        attention_mask: Optional[torch.Tensor] = None,
         compute_kldiv_loss: bool = False
     ) -> SentenceGPTOutput:
         hidden = self.model(inputs_embeds)
-        p = self.reparameterize(hidden)
+        # p = self.reparameterize(hidden)
         if compute_kldiv_loss:
             zkl, zkl_real = self.kldiv_loss(p, Normal(0, 1), attention_mask)
         else:
             zkl, zkl_real = None, None
 
         return SentenceGPTOutput(
-            latent=p, zkl=zkl, zkl_real=zkl_real
+            latent=hidden, zkl=zkl, zkl_real=zkl_real
         )

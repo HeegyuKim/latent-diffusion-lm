@@ -1,0 +1,8 @@
+model: klue/roberta-small
+decoder: gpt2-tiny.json
+decoder_max_seq_len: 64
+latent_dim: 512
+max_seq_len: 512
+free_bit: 2.0
+use_plm: true
+is_vae: true

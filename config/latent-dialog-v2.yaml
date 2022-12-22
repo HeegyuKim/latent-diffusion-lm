@@ -1,0 +1,15 @@
+defaults:
+- optimizer: adam
+- logger: wandb
+- dataset: latent-dialog-v2
+- model: latent-dialog-v2
+- trainer: latent-dialog-v2
+- _self_
+
+# trainer:
+#   run_name: tiny-opt44M
+
+model:
+  max_seq_len: 64
+optimizer:
+  learning_rate: 1e-3

@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, GPT2Config
 
 from .base import BaseTask
 from omegaconf import DictConfig
@@ -21,6 +21,7 @@ from ..dataset.latent_dialog import LatentDialogDataset
 from ..dataset import dataset_utils
 from .. import model_utils
 from coop.models.bertvae import BertVAE
+from coop.models.optimus_v2 import OptimusDecoder
 from .optimus_v2 import OptimusTask, switch_dict_tensor_device
 
 from tqdm import tqdm
@@ -36,18 +37,32 @@ class ListCollator():
                 out[k].append(v)
 
         return out
-        
+
+def constrasive_mse_loss(X, Y, lamb: float = 0.1):
+    pair_mse = F.mse_loss(X, Y)
+
+    bs = X.shape[0]
+    X = X.unsqueeze(1).repeat(1,bs,1)
+    mse = ((X - Y) ** 2).sum(-1).sqrt()
+
+    # diag_mse = mse.diag().mean()
+    neg_mse = mse.masked_fill(torch.eye(bs, device=X.device) == 1, 0).sum() / (bs * bs - bs)
+
+    loss = pair_mse - lamb * neg_mse        
+    return loss, pair_mse, neg_mse
+    # return diag_mse, diag_mse, 0
 
 class LatentDialogTaskV2(BaseTask):
 
     def __init__(self, config: DictConfig) -> None:
         super().__init__(config)
         self.tokenizer = AutoTokenizer.from_pretrained(config.model.model)
-        self.model = BertVAE(config.model.model, config.model.latent_dim)
-        self.autoencoder = OptimusTask.load_from_checkpoint(to_absolute_path(config.model.autoencoder))
+        self.context_model = BertVAE(config.model.model, config.model.latent_dim)
+        self.response_model = BertVAE(config.model.model, config.model.latent_dim)
 
-        model_utils.freeze_model(self.autoencoder)
-    
+        dec_config = GPT2Config.from_json_file(to_absolute_path("config/model/" + config.model.decoder))
+        self.decoder = OptimusDecoder(dec_config, config.model.latent_dim, self.tokenizer.pad_token_id)
+
     def get_train_collator(self) -> Callable:
         return ListCollator()
 
@@ -65,9 +80,6 @@ class LatentDialogTaskV2(BaseTask):
             self.config.dataset.test,
             split="train"
         )
-
-    def encode_text(self, texts: Union[str, List[str]]):
-        pass
 
     def _truncate_and_pad(self, inputs):
         pad_token_id = self.tokenizer.pad_token_id
@@ -107,68 +119,102 @@ class LatentDialogTaskV2(BaseTask):
 
         return inputs
 
-    def step(self, batch):
-        context = self.tokenizer(batch["context"], padding=False, truncation=False, add_special_tokens=False)
-        context = self._truncate_and_pad(context)
+    @torch.no_grad()
+    def generate(
+        self,
+        z: torch.Tensor,
+        input_ids: torch.Tensor=None,
+        **kwargs
+    ):
+        bz, _ = z.size()
 
-        generated = self.model(**context).latent
-        response = self.autoencoder.encode(batch["response"], return_distribution=True)
+        if input_ids is None:
+            input_ids = z.new_full((bz, 1), dtype=torch.long, fill_value=self.tokenizer.bos_token_id)
 
-        loss = kl_divergence(generated, response).mean()
-        return loss, generated
+        generated = self.decoder.generate(
+            input_ids,
+            bos_token_id=self.tokenizer.cls_token_id,
+            pad_token_id=self.tokenizer.pad_token_id,
+            eos_token_id=self.tokenizer.sep_token_id,
+            past_key_values=(z,),
+            latent_as_gpt_memory=True,
+            latent_as_gpt_emb=True,
+            **kwargs
+        ).tolist()
 
-    def step_nll(self, batch):
-        context = self.tokenizer(batch["context"], padding=False, truncation=False, add_special_tokens=False)
-        context = self._truncate_and_pad(context)
-
-        generated = self.model(**context).latent
-        response = self.autoencoder.tokenizer(batch["response"], padding=True, truncation=True, max_length=64, return_tensors="pt")
-        switch_dict_tensor_device(response, self.device)
-        response["labels"] = response["input_ids"]
+        generated = self.tokenizer.batch_decode(generated)
         
-        loss = self.autoencoder.model.decoder(
-            **response,
-            past_key_values=(generated.loc,),
+        return generated
+
+    def step(self, batch, generate = False):
+        context = batch["context"]
+        context = self.tokenizer(context, padding=False, truncation=False, add_special_tokens=False)
+        context = self._truncate_and_pad(context)
+        context = self.context_model(**context).latent.loc
+
+        response = batch["response"]
+        response_inputs = self.tokenizer(response, padding=False, truncation=False, add_special_tokens=False)
+        response = self._truncate_and_pad(response_inputs)
+        response = self.response_model(**response).latent.loc
+
+        loss, pos_loss, cont_loss = constrasive_mse_loss(context, response)
+
+        del response_inputs["token_type_ids"]
+        res_ids = response_inputs["input_ids"]
+        response_inputs["labels"] = res_ids.masked_fill(res_ids == self.tokenizer.pad_token_id, -100)
+        outputs = self.decoder(
+            **response_inputs,
+            past_key_values=(context,),
             latent_as_gpt_memory=True,
             latent_as_gpt_emb=True,
             return_dict=True
-        ).loss
-        return loss, generated
+        )
+        nll_loss = outputs.loss
+        loss = loss + nll_loss
+
+        if generate:
+            gen = self.generate(
+                context,
+                max_length=self.config.model.decoder_max_seq_len,
+                min_length=3,
+                repetition_penalty=2.0,
+                num_beams=4
+            )
+            return loss, pos_loss, cont_loss, nll_loss, gen
+        else:
+            return loss, pos_loss, cont_loss, nll_loss, None
 
     def training_step(self, batch, batch_idx) -> dict:
-        loss, _ = self.step(batch)
-        out = {"loss": loss}
+        loss, pos_loss, cont_loss, nll_loss, _ = self.step(batch)
+        out = {"loss": loss, "mse_loss": pos_loss, "cont_mse_loss": cont_loss, "nll_loss": nll_loss}
         self.log_dict(out, prefix="train_", prog_bar=True)
         return out
 
     def validation_step(self, batch, batch_idx) -> dict:
         batch_size = len(batch["context"])
-        loss, response = self.step(batch)
-        out = {"loss": loss}
+        loss, pos_loss, cont_loss, nll_loss, gen = self.step(batch, generate=batch_idx < 5)
+        out = {"loss": loss, "mse_loss": pos_loss, "cont_mse_loss": cont_loss, "nll_loss": nll_loss}
         self.log_dict(out, prefix="eval_", on_epoch=True, prog_bar=True, batch_size=batch_size)
         
-        if batch_idx < 1:
+        if gen is not None:
             input_sents = batch["context"]
             label_sents = batch["response"]
-            output_sents = self.autoencoder.generate(response.loc, min_length=3, num_beams=4, max_length=64)
-            lev_dist_mean = levenshtein_batch(label_sents, output_sents)
-            self.log("eval_levenshtein_dist", lev_dist_mean, on_epoch=True, prog_bar=True, batch_size=batch_size)
 
             return {
                 "context": input_sents,
                 "response": label_sents,
-                "generated": output_sents
+                "prediction": gen
             }
         else:
             return None
 
     def validation_epoch_end(self, validation_step_outputs) -> None:
-        table = wandb.Table(columns=["context", "response", "generated"])
+        table = wandb.Table(columns=["context", "response", "prediction"])
 
         for batch in validation_step_outputs:
             if batch is not None:
-                for ctx, res, gen in zip(batch["context"], batch["response"], batch["generated"]):
-                    table.add_data(ctx, res, gen)
+                for ctx, res, loss in zip(batch["context"], batch["response"], batch["prediction"]):
+                    table.add_data(ctx, res, loss)
 
         if wandb.run is not None:
             wandb.log({"sample": table})

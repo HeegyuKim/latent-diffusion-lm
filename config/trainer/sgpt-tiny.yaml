@@ -2,7 +2,7 @@ train_batch_size: 64
 train_epochs: 20
 
 shuffle: false
-eval_batch_size: 8
+eval_batch_size: 1
 eval_strategy: epoch
 
 gradient_clip_val: 1.0
@@ -12,5 +12,5 @@ project: sgpt
 run_name: tiny-opt44M
 num_sanity_val_steps: 0
 
-limit_train_batches: 100
-limit_val_batches: 2
+limit_train_batches: 50
+limit_val_batches: 1

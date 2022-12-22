@@ -38,7 +38,7 @@ class OptimusTask(BaseTask):
         
         self.encoder_config = RobertaConfig.from_json_file(to_absolute_path("config/model/" + config.model.encoder))
         self.decoder_config = GPT2Config.from_json_file(to_absolute_path("config/model/" + config.model.decoder))
-        if self.config.model.get("bow_loss", True):
+        if self.config.model.get("bow_loss", False):
             self.bow_model = BowPredictor(config.model.latent_dim, self.encoder_config.vocab_size)   
         self.model = Optimus(
             config.model.latent_dim,

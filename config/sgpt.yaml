@@ -9,4 +9,7 @@ defaults:
 model:
   max_seq_len: 32
 trainer:
-  run_name: tiny-bow-poc
+  run_name: tiny-opt44M
+
+optimizer:
+  learning_rate: 1e-3
